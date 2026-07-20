@@ -1,0 +1,72 @@
+# Dependabot configuration.
+#
+# Three ecosystems are watched. Commit prefixes are chosen so every
+# automated PR is a valid Conventional Commit and release-please keeps
+# parsing the history correctly:
+#   - cargo           -> build(deps): ...
+#   - github-actions  -> ci(deps): ...
+#   - docker          -> build(deps): ...
+version: 2
+
+updates:
+  # Rust dependencies (workspace-wide: Dependabot reads the root
+  # Cargo.toml and the lockfile). Minor and patch bumps are grouped into
+  # a single weekly PR to keep the review load sane; majors stay
+  # individual because they usually need real attention.
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    groups:
+      rust-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions used by the workflows in .github/workflows/.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base images of the Dockerfile. The build stage pulls from dhi.io
+  # (Docker Hardened Images, authenticated): for Dependabot to see those
+  # tags, declare the registry credentials in the repository settings
+  # (Settings > Code security > Dependabot > registries) — until then it
+  # only tracks images it can reach anonymously.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+
+  # The postgres image of the local development stack.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    commit-message:
+      prefix: "build"
+      include: "scope"

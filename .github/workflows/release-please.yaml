@@ -1,0 +1,28 @@
+# Release automation.
+#
+# release-please parses the Conventional Commits history of main,
+# maintains a release PR (version bump + changelog, driven by
+# release-please-config.json and .release-please-manifest.json at the
+# repository root) and tags the release when that PR is merged.
+#
+# Note: PRs opened with the default GITHUB_TOKEN do not trigger other
+# workflows (GitHub loop protection). If the `ci` workflow must run on
+# release PRs, replace the token below with a fine-grained PAT stored as
+# a repository secret.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

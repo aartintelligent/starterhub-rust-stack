@@ -1,0 +1,3 @@
+# Default reviewers, requested automatically on every PR.
+# Adjust the handle if the repository lands under another account/org.
+* @aartintelligent

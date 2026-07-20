@@ -1,0 +1,46 @@
+# Continuous integration.
+#
+# One job that runs `just ci`, i.e. exactly the local quality gate
+# (fmt-check, clippy with -D warnings, tests): CI and the developer
+# machine can never disagree on what "green" means.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only token: this workflow only builds and tests.
+permissions:
+  contents: read
+
+# One run per ref: a new push cancels the previous run on branches, but
+# never on main so its history of results stays complete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  gate:
+    name: quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # rustup reads rust-toolchain.toml, so the exact pinned compiler
+      # (channel + clippy + rustfmt) is installed — never "whatever
+      # stable the runner ships".
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+
+      # Cache ~/.cargo and target/ keyed on the lockfile and toolchain.
+      - uses: Swatinem/rust-cache@v2
+
+      # `just` is the single entry point for every recipe, in CI as
+      # locally.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Run the quality gate
+        run: just ci
