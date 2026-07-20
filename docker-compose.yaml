@@ -1,0 +1,37 @@
+# Local development stack.
+#
+# Provides the PostgreSQL instance the application expects out of the box:
+# credentials, database name and port all match the defaults hard-coded in
+# common/src/config.rs, so `docker compose up -d` followed by `just run`
+# works with zero configuration.
+
+services:
+  postgres:
+    # Debian-based official image (Trixie = Debian 13, the deployment
+    # target of the project); major 17 is a stable, long-supported line
+    # (PostgreSQL majors receive 5 years of fixes).
+    image: postgres:17-trixie
+    container_name: ipam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: ipam
+    ports:
+      - "5432:5432"
+    volumes:
+      # Named volume: the data survives `docker compose down`; wipe it
+      # explicitly with `docker compose down -v` when a fresh database
+      # is wanted.
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Same signal as the application's readiness probe: the database
+      # accepts connections. Lets dependents wait on `service_healthy`.
+      test: ["CMD-SHELL", "pg_isready -U root -d ipam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data:

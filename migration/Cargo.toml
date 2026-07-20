@@ -1,0 +1,27 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "migration"
+publish.workspace      = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+name = "migration"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+common = { workspace = true }
+entity = { workspace = true }
+tokio  = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[dependencies.sea-orm-migration]
+features = [
+    # Enable following runtime and db backend features if you want to run migration via CLI
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+]
+workspace = true

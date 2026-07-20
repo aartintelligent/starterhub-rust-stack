@@ -1,0 +1,20 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "entity"
+publish.workspace      = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+name = "entity"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+
+[dependencies.sea-orm]
+workspace = true

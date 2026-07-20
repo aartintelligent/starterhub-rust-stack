@@ -1,0 +1,6 @@
+[toolchain]
+# Pinned to the same line as ARG RUST_VERSION in the Dockerfile: local
+# builds, CI and the container image must all compile with one compiler.
+channel    = "1.97"
+components = ["clippy", "rustfmt"]
+profile    = "default"

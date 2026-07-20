@@ -1,0 +1,22 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "cron"
+publish.workspace      = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+name = "cron"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow               = { workspace = true }
+async-trait          = { workspace = true }
+sea-orm              = { workspace = true }
+thiserror            = { workspace = true }
+tokio-cron-scheduler = { workspace = true }
+tracing              = { workspace = true }

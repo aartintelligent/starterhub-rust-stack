@@ -1,0 +1,22 @@
+# Keep the build context minimal and free of secrets: only what
+# `cargo build` needs may reach the daemon.
+
+# Build artifacts (the image rebuilds from source, caches live in BuildKit)
+target/
+
+# Version control and IDE state
+.git/
+.idea/
+.vscode/
+
+# Local environment and configuration overrides (secrets never enter the
+# build context; runtime configuration is injected at deploy time)
+.env
+.env.*
+!.env.example
+app-config.json
+
+# Container tooling itself
+Dockerfile
+docker-compose.yaml
+.dockerignore

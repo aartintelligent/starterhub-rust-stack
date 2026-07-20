@@ -1,0 +1,30 @@
+[package]
+edition.workspace      = true
+license.workspace      = true
+name                   = "common"
+publish.workspace      = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+name = "common"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow  = { workspace = true }
+config  = { workspace = true }
+dotenvy = { workspace = true }
+secrecy = { workspace = true }
+serde   = { workspace = true, features = ["derive"] }
+
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[dependencies.sea-orm]
+features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+]
+workspace = true

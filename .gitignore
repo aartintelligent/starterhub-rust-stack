@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Git ignore rules
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ---- Rust / Cargo ----
+# Build directory
+/target/
+
+# Backup files produced by some rustfmt/rustfix runs
+**/*.rs.bk
+
+# Profiling and benchmarking artifacts
+cargo-profiler.log
+perf.data*
+flamegraph.svg
+
+# ---- Compiled binaries ----
+*.exe
+*.dll
+*.dylib
+*.so
+
+# ---- Editors / IDE ----
+# Claude Code session-local state
+.claude/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# IntelliJ / CLion / RustRover
+.idea/
+
+# Emacs / Vim
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ---- OS specific ----
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# ---- Coverage / generated reports ----
+lcov.info
+coverage/
+*.profraw
+*.profdata
+
+# ---- Logs and temporary files ----
+*.log
+*.tmp
+*.swp
+
+# ---- Secrets / credentials ----
+# Environment files (committed examples stay allowed)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Local application configuration (must never be committed)
+app-config.json
