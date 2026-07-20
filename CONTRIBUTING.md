@@ -32,7 +32,7 @@ metadata, dependencies and lints from the root `Cargo.toml`
 | `extract.rs`  | Crate-local extractors (`Json`, `Path`) rejecting through `ApiError`. |
 | `handler/`    | Business handlers only: extract input, call a service, map the result. |
 | `middleware/` | Cross-cutting layers: one module per concern, composed in `middleware::apply` via `tower::ServiceBuilder`. |
-| `router/`     | The only place where URLs are declared; also hosts the technical endpoints (health probes, 404 fallback). |
+| `router/`     | The only place where URLs are declared; also hosts the technical endpoints (health probes, 404 fallback) and the OpenAPI document (`ApiDoc` + Swagger UI). |
 | `server.rs`   | HTTP server bootstrap (`Server::new(addr, conn).run()`).            |
 | `service/`    | Business logic, split between `Query` (reads) and `Mutation` (writes). |
 | `state.rs`    | `AppState`, the dependencies shared with every handler.             |
@@ -51,6 +51,11 @@ Hard rules:
   probe conventions and stay at the root, outside any versioned prefix.
   They are defined in `router/`, not in `handler/`: `handler/` is reserved
   for business resources.
+- Every endpoint is part of the OpenAPI contract: annotate its handler
+  with `#[utoipa::path]` and register it in the `paths(...)` list of
+  `ApiDoc` (in `router/mod.rs`). Swagger UI is served on `/docs`,
+  the generated document on `/api-docs/openapi.json`; an endpoint missing
+  from `ApiDoc` is invisible there and counts as undocumented.
 - Middlewares do one thing each: prefer `tower-http`'s layers, use
   `axum::middleware::from_fn` for simple internal logic, and write a full
   `tower::Layer`/`Service` pair only for configurable/publishable

@@ -24,6 +24,12 @@ tokio      = { workspace = true, features = ["macros", "net", "rt-multi-thread"]
 tower      = { workspace = true }
 tower-http = { workspace = true, features = ["catch-panic", "request-id", "trace"] }
 tracing    = { workspace = true }
+utoipa     = { workspace = true, features = ["axum_extras"] }
+
+# `vendored` embeds the Swagger UI assets at compile time instead of having
+# the build script download them from GitHub: keeps the Docker build
+# reproducible and free of ad-hoc network access.
+utoipa-swagger-ui = { workspace = true, features = ["axum", "vendored"] }
 
 [dependencies.sea-orm]
 features = [
