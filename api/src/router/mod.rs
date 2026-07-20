@@ -26,17 +26,19 @@ use crate::state::AppState;
 
 /// The OpenAPI description of this API, derived at compile time.
 ///
-/// `title`/`version` default to the crate metadata, so the document
-/// version follows the workspace release automatically. Register every
-/// new `#[utoipa::path]`-annotated handler in `paths(...)`: an endpoint
-/// absent from this list is invisible in Swagger UI.
+/// The version defaults to the crate metadata, so the document version
+/// follows the workspace release automatically. The description stays
+/// short and non-technical — the endpoint annotations carry the
+/// technical details. Register every new `#[utoipa::path]`-annotated
+/// handler in `paths(...)`: an endpoint absent from this list is
+/// invisible in Swagger UI.
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "IPAM",
-        description = "IP Address Management service. Every response body, \
-                       success or failure, is JSON; failures use the \
-                       `{ \"error\": ... }` envelope."
+        description = "Plan, allocate and track the IP subnets and \
+                       addresses of your network, from a single place.",
+        license(name = "MIT", identifier = "MIT")
     ),
     paths(livez, readyz),
     tags(
