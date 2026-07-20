@@ -2,12 +2,14 @@
 members  = [".", "api", "common", "cron", "entity", "migration"]
 resolver = "3"
 
+# `version` is intentionally NOT part of [workspace.package]: release-please's
+# rust strategy can only rewrite literal `version = "x.y.z"` strings, so every
+# crate declares its own version and the release PR bumps them in lockstep.
 [workspace.package]
 edition      = "2024"
 license      = "MIT"
 publish      = false
 rust-version = "1.97"
-version      = "0.1.0" # x-release-please-version
 
 [workspace.lints.rust]
 missing_docs = "warn"
@@ -50,7 +52,7 @@ license.workspace      = true
 name                   = "ipam"
 publish.workspace      = true
 rust-version.workspace = true
-version.workspace      = true
+version                = "0.1.0"
 
 [lints]
 workspace = true
