@@ -25,7 +25,7 @@ jobs:
     name: quality gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # rustup reads rust-toolchain.toml, so the exact pinned compiler
       # (channel + clippy + rustfmt) is installed — never "whatever
