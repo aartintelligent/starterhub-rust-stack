@@ -10,14 +10,17 @@
 # resurrect an outdated workflow. Dispatching from main with the tag as
 # input always uses the current workflow against the tagged sources.
 #
-# Caching strategy: the runners are persistent (organization
-# self-hosted), so the build relies on the local Docker daemon's
-# BuildKit state. Layers AND the Dockerfile's RUN cache mounts (cargo
-# registry, target/) survive from build to build on the same runner —
-# something the ephemeral `gha` cache backend cannot do, since it never
-# stores RUN cache mount contents. Hence no setup-buildx (its
-# docker-container driver starts from an empty state every run) and no
-# cache-from/cache-to.
+# Caching strategy — two complementary layers, because the "default"
+# runner group has many machines and a job may land on any of them:
+#   1. Per machine: a NAMED persistent BuildKit builder (created
+#      idempotently below). Its state volume outlives the job, so the
+#      Dockerfile's RUN cache mounts (cargo registry, target/) are
+#      reused on the next build on the same machine — the one thing no
+#      remote cache backend can persist.
+#   2. Across machines: image layers are exported to a registry cache
+#      (the :buildcache tag on GHCR, mode=max), so a machine that never
+#      built the project starts from the last build's layers instead of
+#      from scratch.
 #
 # Notes:
 #   - The build stage pulls Docker Hardened Images from dhi.io, an
@@ -57,6 +60,16 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
+      # Idempotent: create the machine-local persistent builder on
+      # first use, reuse it afterwards. A named docker-container
+      # builder keeps its BuildKit state (RUN cache mounts included)
+      # between jobs AND supports the registry cache exporter, which
+      # the plain docker driver does not.
+      - name: Create or reuse the persistent BuildKit builder
+        run: |
+          docker buildx inspect ipam >/dev/null 2>&1 \
+            || docker buildx create --name ipam --driver docker-container --bootstrap
+
       - name: Log in to dhi.io (hardened base images)
         uses: docker/login-action@v4
         with:
@@ -84,7 +97,13 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
+          builder: ipam
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Cross-machine layer cache on GHCR; mode=max also exports
+          # the intermediate build-stage layers, not just the final
+          # image ones.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache,mode=max
