@@ -23,15 +23,26 @@ concurrency:
 jobs:
   gate:
     name: quality gate
-    runs-on: ubuntu-latest
+    # Organization self-hosted runners (group "default"). Groups are not
+    # addressable in runs-on: jobs target labels, and the group only
+    # decides which repositories may use its runners.
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
 
       # rustup reads rust-toolchain.toml, so the exact pinned compiler
       # (channel + clippy + rustfmt) is installed — never "whatever
-      # stable the runner ships".
+      # stable the runner ships". Self-hosted runners are not guaranteed
+      # to ship rustup, so bootstrap it idempotently first.
       - name: Install the pinned toolchain
-        run: rustup toolchain install
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --default-toolchain none
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup toolchain install
 
       # Cache ~/.cargo and target/ keyed on the lockfile and toolchain.
       - uses: Swatinem/rust-cache@v2

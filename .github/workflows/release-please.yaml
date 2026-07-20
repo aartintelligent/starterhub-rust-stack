@@ -21,7 +21,8 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    # Organization self-hosted runners (group "default").
+    runs-on: self-hosted
     steps:
       - uses: googleapis/release-please-action@v5
         with:

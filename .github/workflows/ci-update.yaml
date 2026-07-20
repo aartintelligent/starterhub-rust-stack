@@ -22,7 +22,9 @@ jobs:
     # Guard on the actor, not the branch name: only PRs actually opened
     # by Dependabot are trusted here.
     if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    # Organization self-hosted runners (group "default"); the runner
+    # must provide the `gh` CLI.
+    runs-on: self-hosted
     steps:
       # Exposes the parsed update metadata (semver bump level, ecosystem)
       # of the Dependabot PR to the steps below.
