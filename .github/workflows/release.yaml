@@ -1,8 +1,8 @@
 # Release artifacts.
 #
 # Builds the production image from the Dockerfile and pushes it to
-# GitHub Container Registry when a release is published (by
-# release-please) — plus a manual trigger for reruns.
+# Docker Hub (docker.io/aartintelligent/ipam) when a release is
+# published (by release-please) — plus a manual trigger for reruns.
 #
 # The manual trigger takes the release tag as an input and runs from
 # main on purpose: a workflow_dispatch executes the workflow file as it
@@ -18,14 +18,16 @@
 #      reused on the next build on the same machine — the one thing no
 #      remote cache backend can persist.
 #   2. Across machines: image layers are exported to a registry cache
-#      (the :buildcache tag on GHCR, mode=max), so a machine that never
-#      built the project starts from the last build's layers instead of
-#      from scratch.
+#      (the :buildcache tag on Docker Hub, mode=max), so a machine that
+#      never built the project starts from the last build's layers
+#      instead of from scratch.
 #
 # Notes:
 #   - The build stage pulls Docker Hardened Images from dhi.io, an
-#     authenticated registry: DHI_USERNAME / DHI_PASSWORD must exist as
-#     repository secrets.
+#     authenticated registry. dhi.io authenticates with the Docker ID,
+#     so the same DHI_USERNAME / DHI_PASSWORD secrets log in to both
+#     dhi.io (pull) and docker.io (push); the token behind DHI_PASSWORD
+#     therefore needs write access on the aartintelligent namespace.
 #   - Releases created with the default GITHUB_TOKEN do not trigger
 #     other workflows (GitHub loop protection). For this workflow to
 #     fire automatically on release, run release-please with a PAT; the
@@ -42,10 +44,10 @@ on:
         required: true
         type: string
 
+# Read-only token: the image goes to Docker Hub, nothing is written on
+# the GitHub side.
 permissions:
   contents: read
-  # Needed to push the image to ghcr.io under this repository.
-  packages: write
 
 jobs:
   image:
@@ -77,19 +79,20 @@ jobs:
           username: ${{ secrets.DHI_USERNAME }}
           password: ${{ secrets.DHI_PASSWORD }}
 
-      - name: Log in to GitHub Container Registry
+      # No registry input: docker.io is the default. Same Docker ID as
+      # the dhi.io login above.
+      - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DHI_USERNAME }}
+          password: ${{ secrets.DHI_PASSWORD }}
 
       # Derives the image tags from the release tag (vX.Y.Z): the exact
       # version, the moving X.Y, and latest.
       - uses: docker/metadata-action@v6
         id: meta
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: docker.io/aartintelligent/ipam
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
@@ -102,8 +105,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Cross-machine layer cache on GHCR; mode=max also exports
-          # the intermediate build-stage layers, not just the final
-          # image ones.
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache,mode=max
+          # Cross-machine layer cache on Docker Hub; mode=max also
+          # exports the intermediate build-stage layers, not just the
+          # final image ones. image-manifest packages the cache as a
+          # regular OCI manifest, the format Docker Hub accepts.
+          cache-from: type=registry,ref=docker.io/aartintelligent/ipam:buildcache
+          cache-to: type=registry,ref=docker.io/aartintelligent/ipam:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
