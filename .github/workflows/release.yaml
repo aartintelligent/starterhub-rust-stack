@@ -4,6 +4,21 @@
 # GitHub Container Registry when a release is published (by
 # release-please) — plus a manual trigger for reruns.
 #
+# The manual trigger takes the release tag as an input and runs from
+# main on purpose: a workflow_dispatch executes the workflow file as it
+# exists at the dispatched ref, so dispatching on an old tag would
+# resurrect an outdated workflow. Dispatching from main with the tag as
+# input always uses the current workflow against the tagged sources.
+#
+# Caching strategy: the runners are persistent (organization
+# self-hosted), so the build relies on the local Docker daemon's
+# BuildKit state. Layers AND the Dockerfile's RUN cache mounts (cargo
+# registry, target/) survive from build to build on the same runner —
+# something the ephemeral `gha` cache backend cannot do, since it never
+# stores RUN cache mount contents. Hence no setup-buildx (its
+# docker-container driver starts from an empty state every run) and no
+# cache-from/cache-to.
+#
 # Notes:
 #   - The build stage pulls Docker Hardened Images from dhi.io, an
 #     authenticated registry: DHI_USERNAME / DHI_PASSWORD must exist as
@@ -18,6 +33,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g. v0.2.0)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -28,13 +48,14 @@ jobs:
   image:
     name: build and push image
     # Organization self-hosted runners (group "default"); the runner
-    # must provide a Docker daemon for buildx to drive.
+    # must provide a Docker daemon with BuildKit (Docker Engine 23+).
     runs-on: self-hosted
     steps:
+      # Build the sources of the release tag, whichever event fired:
+      # the input on manual runs, the release tag itself otherwise.
       - uses: actions/checkout@v7
-
-      # BuildKit is required by the Dockerfile (cache mounts, syntax=).
-      - uses: docker/setup-buildx-action@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Log in to dhi.io (hardened base images)
         uses: docker/login-action@v4
@@ -57,8 +78,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v7
@@ -67,6 +88,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Layer cache shared through the GitHub Actions cache backend.
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
