@@ -107,7 +107,7 @@ These are enforced by the toolchain — CI and `just ci` fail otherwise:
   paraphrasing the line below it is noise.
 - **Formatting and lints are non-negotiable.** `cargo fmt` (see
   `rustfmt.toml`) and `cargo clippy --workspace --all-targets` with zero
-  warnings (see `clippy.toml`, MSRV 1.85).
+  warnings (see `clippy.toml`, MSRV 1.97).
 - **Dependencies** are declared once in `[workspace.dependencies]` and
   inherited with `workspace = true`. Features are added at the crate that
   needs them. Do not pin versions in member crates.
