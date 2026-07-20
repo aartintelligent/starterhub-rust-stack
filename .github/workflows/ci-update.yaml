@@ -1,0 +1,39 @@
+# Dependabot auto-merge.
+#
+# Enables GitHub auto-merge on Dependabot PRs for minor and patch
+# updates: the PR merges by itself once the required checks (the `ci`
+# workflow) are green. Major updates are left alone — they usually need
+# a human.
+#
+# Prerequisites on the repository:
+#   - Settings > General > "Allow auto-merge" enabled.
+#   - Branch protection on main with the `quality gate` check required,
+#     otherwise auto-merge fires before CI has proven anything.
+name: ci-update
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    # Guard on the actor, not the branch name: only PRs actually opened
+    # by Dependabot are trusted here.
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      # Exposes the parsed update metadata (semver bump level, ecosystem)
+      # of the Dependabot PR to the steps below.
+      - uses: dependabot/fetch-metadata@v2
+        id: metadata
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for minor and patch updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,70 @@
+# Release artifacts.
+#
+# Builds the production image from the Dockerfile and pushes it to
+# GitHub Container Registry when a release is published (by
+# release-please) — plus a manual trigger for reruns.
+#
+# Notes:
+#   - The build stage pulls Docker Hardened Images from dhi.io, an
+#     authenticated registry: DHI_USERNAME / DHI_PASSWORD must exist as
+#     repository secrets.
+#   - Releases created with the default GITHUB_TOKEN do not trigger
+#     other workflows (GitHub loop protection). For this workflow to
+#     fire automatically on release, run release-please with a PAT; the
+#     workflow_dispatch trigger is the fallback until then.
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Needed to push the image to ghcr.io under this repository.
+  packages: write
+
+jobs:
+  image:
+    name: build and push image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # BuildKit is required by the Dockerfile (cache mounts, syntax=).
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to dhi.io (hardened base images)
+        uses: docker/login-action@v3
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DHI_USERNAME }}
+          password: ${{ secrets.DHI_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Derives the image tags from the release tag (vX.Y.Z): the exact
+      # version, the moving X.Y, and latest.
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache shared through the GitHub Actions cache backend.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
