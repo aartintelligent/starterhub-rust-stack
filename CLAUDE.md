@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `CONTRIBUTING.md` is the **authoritative ruleset** for this repository: crate/module layout tables ("where code goes"), hard API rules, migration rules, and the Conventional Commits v1.0.0 format (parsed by release-please — a malformed commit message corrupts the release pipeline). Read it before writing code. This file only adds commands and the cross-file architecture picture.
 
+Branching: `main` is the only long-lived branch, never pushed directly. Work happens on `<type>/<short-topic>` branches merged back by squash through a PR whose title is a Conventional Commit.
+
 ## Commands
 
 Recipes live in the `justfile` (auto-loads `.env`):

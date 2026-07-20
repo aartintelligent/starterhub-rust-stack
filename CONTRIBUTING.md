@@ -119,6 +119,25 @@ These are enforced by the toolchain — CI and `just ci` fail otherwise:
 
 ## Development workflow
 
+### Branching model
+
+`main` is the only long-lived branch and is protected: **nothing is
+pushed to it directly**. Every change follows the same cycle:
+
+1. Branch off `main`: `<type>/<short-topic>` where `<type>` is the
+   Conventional Commit type of the change (`feat/subnet-allocation`,
+   `fix/readyz-timeout`, `ci/cache-key`).
+2. Open a pull request targeting `main`. The `ci` workflow runs the
+   quality gate on it; the PR title must be a Conventional Commit — with
+   squash merge it becomes the commit on `main`.
+3. Merge by **squash** once the gate is green. Delete the branch.
+
+Releases close the loop automatically: release-please watches `main`,
+maintains the release PR, and tags when it merges — same cycle, no
+manual step.
+
+### Daily commands
+
 Recipes are defined in the `justfile`:
 
 ```sh
