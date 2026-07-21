@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/app/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     cargo build --release --locked \
-    && cp target/release/ipam /usr/local/bin/ipam
+    && cp target/release/rust-service-starter /usr/local/bin/rust-service-starter
 
 # ---------------------------------------------------------------------------
 # Runtime stage
@@ -47,20 +47,20 @@ RUN --mount=type=cache,target=/app/target \
 FROM dhi.io/debian-base:trixie AS runtime
 
 # OCI metadata so registries and scanners can trace the artifact.
-LABEL org.opencontainers.image.title="ipam" \
-      org.opencontainers.image.description="IP Address Management service" \
+LABEL org.opencontainers.image.title="rust-service-starter" \
+      org.opencontainers.image.description="Production-grade foundation for Rust service stacks" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/aartintelligent/ipam"
+      org.opencontainers.image.source="https://github.com/aartintelligent/rust-service-starter"
 
 # Single, root-owned, world-readable binary: the nonroot user must be able
 # to execute it but never to overwrite it.
-COPY --from=build /usr/local/bin/ipam /usr/local/bin/ipam
+COPY --from=build /usr/local/bin/rust-service-starter /usr/local/bin/rust-service-starter
 
 # Containers listen on all interfaces (the pod/network boundary does the
 # isolation), and 8080 respects the nonroot >1024 port constraint baked
 # into the hardened image. Everything else keeps the application defaults
 # and stays overridable through APP_* variables or a config file mounted
-# at /etc/ipam/app-config.json.
+# at /etc/rust-service-starter/app-config.json.
 ENV APP_SERVER__HOST=0.0.0.0 \
     APP_SERVER__PORT=8080
 
@@ -77,4 +77,4 @@ USER nonroot
 # Exec form, no shell involved: PID 1 is the application itself, so
 # SIGTERM from the orchestrator reaches the graceful-shutdown handler
 # directly.
-ENTRYPOINT ["/usr/local/bin/ipam"]
+ENTRYPOINT ["/usr/local/bin/rust-service-starter"]

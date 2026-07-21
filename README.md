@@ -1,13 +1,9 @@
-# ipam
+# rust-service-starter
 
-IPAM (IP Address Management) is the single source of truth for the IP
-addressing of an infrastructure: one service where every network, subnet
-and address is recorded, allocated without conflicts and visible at a
-glance — instead of spreadsheets that stop working the day two teams
-allocate the same range.
-
-A fast REST API written in Rust, backed by PostgreSQL, shipped as a
-hardened container image.
+The foundation for Rust service stacks: a production-grade starter you
+instantiate to begin every new service — not a demo, a **runnable,
+released, containerized service** with the boring-but-vital parts already
+solved and enforced.
 
 > [!IMPORTANT]
 > **Before contributing, read [`CONTRIBUTING.md`](./CONTRIBUTING.md).** It is
@@ -34,13 +30,37 @@ hardened container image.
 ![](https://img.shields.io/badge/release%20please-grey?logo=googlecloud)
 ![](https://img.shields.io/badge/conventional%20commits-grey?logo=conventionalcommits)
 
-**What's inside:** a real, runnable service — an axum HTTP API with
-Kubernetes-style health probes, a Swagger UI on `/docs` generated from the
-code (utoipa), a tokio cron engine running trait-based jobs, layered
-configuration with `secrecy`-protected credentials, sea-orm migrations
-applied at boot, graceful SIGTERM/SIGINT shutdown supervised by a single
-cancellation token, and an automated release pipeline (Conventional Commits
-→ release-please → tag + changelog → hardened Docker image).
+**What's inside:** an axum HTTP API with Kubernetes-style health probes and
+a Swagger UI on `/docs` generated from the code (utoipa), a tokio cron
+engine running trait-based jobs, layered configuration with
+`secrecy`-protected credentials, sea-orm entities and migrations applied at
+boot, graceful SIGTERM/SIGINT shutdown supervised by a single cancellation
+token, strict workspace lints (`unsafe` forbidden, documentation
+mandatory), git hooks, and an automated release pipeline (Conventional
+Commits → release-please → tag + changelog → hardened Docker image).
+
+## 🏗️ Create a new stack from this template
+
+This repository is a **GitHub template**: click **Use this template →
+Create a new repository**, then rebrand the copy — the service name lives
+in a handful of well-known places:
+
+1. `Cargo.toml` — the root `[package] name`.
+2. `Dockerfile` — the two binary paths (`target/release/<name>`,
+   `/usr/local/bin/<name>`) and the OCI labels.
+3. `common/src/config.rs` — the FHS config path (`/etc/<name>/app-config`)
+   and, if wanted, the default database name.
+4. `api/src/router/mod.rs` — the OpenAPI `title`/`description`.
+5. `.github/workflows/release.yaml` — the image repository and the
+   BuildKit builder name.
+6. `release-please-config.json` — `package-name`.
+7. `docker-compose.yaml`, `.env.example`, `lefthook.yml`, this `README.md`
+   — cosmetic mentions.
+8. Repository settings: secrets (`DHI_USERNAME`/`DHI_PASSWORD`), squash-only
+   merge, auto-merge, and self-hosted runner access.
+
+Then delete this section, rewrite the intro above for the new service, and
+start shipping business code (`ARCHITECTURE.md` → *Extending the service*).
 
 ## 🚀 Getting started
 

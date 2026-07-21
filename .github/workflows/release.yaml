@@ -1,7 +1,7 @@
 # Release artifacts.
 #
 # Builds the production image from the Dockerfile and pushes it to
-# Docker Hub (docker.io/aartintelligent/ipam) when a release is
+# Docker Hub (docker.io/aartintelligent/rust-service-starter) when a release is
 # published (by release-please) — plus a manual trigger for reruns.
 #
 # The manual trigger takes the release tag as an input and runs from
@@ -69,8 +69,8 @@ jobs:
       # the plain docker driver does not.
       - name: Create or reuse the persistent BuildKit builder
         run: |
-          docker buildx inspect ipam >/dev/null 2>&1 \
-            || docker buildx create --name ipam --driver docker-container --bootstrap
+          docker buildx inspect rust-service-starter >/dev/null 2>&1 \
+            || docker buildx create --name rust-service-starter --driver docker-container --bootstrap
 
       - name: Log in to dhi.io (hardened base images)
         uses: docker/login-action@v4
@@ -92,7 +92,7 @@ jobs:
       - uses: docker/metadata-action@v6
         id: meta
         with:
-          images: docker.io/aartintelligent/ipam
+          images: docker.io/aartintelligent/rust-service-starter
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
@@ -100,7 +100,7 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
-          builder: ipam
+          builder: rust-service-starter
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -109,5 +109,5 @@ jobs:
           # exports the intermediate build-stage layers, not just the
           # final image ones. image-manifest packages the cache as a
           # regular OCI manifest, the format Docker Hub accepts.
-          cache-from: type=registry,ref=docker.io/aartintelligent/ipam:buildcache
-          cache-to: type=registry,ref=docker.io/aartintelligent/ipam:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
+          cache-from: type=registry,ref=docker.io/aartintelligent/rust-service-starter:buildcache
+          cache-to: type=registry,ref=docker.io/aartintelligent/rust-service-starter:buildcache,mode=max,image-manifest=true,oci-mediatypes=true

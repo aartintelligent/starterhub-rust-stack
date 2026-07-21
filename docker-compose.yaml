@@ -11,23 +11,25 @@ services:
     # target of the project); major 17 is a stable, long-supported line
     # (PostgreSQL majors receive 5 years of fixes).
     image: postgres:18-trixie
-    container_name: ipam-postgres
+    container_name: rust-service-starter-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
-      POSTGRES_DB: ipam
+      POSTGRES_DB: app
     ports:
       - "5432:5432"
     volumes:
       # Named volume: the data survives `docker compose down`; wipe it
       # explicitly with `docker compose down -v` when a fresh database
-      # is wanted.
-      - postgres-data:/var/lib/postgresql/data
+      # is wanted. PostgreSQL 18+ images moved the data directory up to
+      # /var/lib/postgresql (a version-specific subdirectory is created
+      # inside) and refuse the legacy /var/lib/postgresql/data mount.
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       # Same signal as the application's readiness probe: the database
       # accepts connections. Lets dependents wait on `service_healthy`.
-      test: ["CMD-SHELL", "pg_isready -U root -d ipam"]
+      test: ["CMD-SHELL", "pg_isready -U root -d app"]
       interval: 10s
       timeout: 5s
       retries: 5
