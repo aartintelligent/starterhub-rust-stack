@@ -1,191 +1,170 @@
-# Contributing to IPAM
+# Contributing
 
-This document is the **authoritative ruleset** for evolving this project.
-It is written for human developers **and for AI agents** (Claude Code and
-similar): if you are an AI agent working on this repository, treat every
-rule below as a hard constraint. When a change you are asked to make
-conflicts with this document, surface the conflict instead of silently
-breaking the rule.
+Thanks for contributing to ipam. This guide is the **binding process** for
+the repository — how to work in it, the commit and branching rules, and how
+changes reach a release. It applies to human contributors **and to AI
+coding agents**: if a change you are asked to make conflicts with this
+document, surface the conflict instead of silently breaking the rule.
 
-## Project layout
+> Design notes and the guided tour of the codebase live in
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) — read it before writing code.
+> Condensed agent guidance lives in [`CLAUDE.md`](./CLAUDE.md).
+
+## Prerequisites
+
+- The **Rust toolchain** is pinned in `rust-toolchain.toml` (channel,
+  clippy, rustfmt) — rustup provisions it automatically on first `cargo`
+  invocation. The same version is enforced in `Cargo.toml` (`rust-version`),
+  `clippy.toml` (`msrv`) and the `Dockerfile` (`ARG RUST_VERSION`): the four
+  must stay in sync.
+- [just](https://github.com/casey/just) — every workflow goes through the
+  `justfile`.
+- **Docker** with compose — the local PostgreSQL.
+- [lefthook](https://lefthook.dev) and
+  [committed](https://github.com/crate-ci/committed) — only if you install
+  the git hooks (recommended, see below).
+
+## Getting started
+
+```bash
+just db-up       # start PostgreSQL (docker compose) and wait until healthy
+just run         # config -> database -> migrations -> API + cron engine
+just hooks       # install the git hooks (lefthook) — once after cloning
+just ci          # the full quality gate: fmt-check + clippy -D warnings + tests
+```
+
+`just` alone lists every recipe. `check`, `fmt`, `lint` and `test` are the
+fast inner-loop commands; `just ci` is the gate CI enforces on every pull
+request — **run it before every commit; a change that does not pass the
+gate is not finished.**
+
+## Where code goes
 
 The project is a Cargo workspace (resolver 3). Every crate inherits its
-metadata, dependencies and lints from the root `Cargo.toml`
-(`[workspace.package]`, `[workspace.dependencies]`, `[workspace.lints]`).
+metadata, dependencies and lints from the root `Cargo.toml`.
 
-| Crate        | Role                                                                |
-| ------------ | ------------------------------------------------------------------- |
-| `.` (`ipam`) | Binary entry point: boot sequence only, no business logic.          |
-| `api`        | HTTP layer: routing, handlers, DTOs, errors, server bootstrap.      |
-| `common`     | Shared building blocks: configuration, telemetry, infrastructure.   |
-| `entity`     | Database entities (sea-orm models), one module per table.           |
+| Crate        | Role                                                                 |
+| ------------ | -------------------------------------------------------------------- |
+| `.` (`ipam`) | Binary entry point: boot sequence only, no business logic.           |
+| `api`        | HTTP layer: routing, handlers, DTOs, errors, OpenAPI, server.        |
+| `common`     | Shared building blocks: configuration, telemetry, infrastructure.    |
+| `entity`     | Database entities (sea-orm models) — the single home for data models. |
 | `cron`       | Cron jobs (tokio-cron-scheduler): one job per file, hard-coded schedules. |
-| `migration`  | Schema migrations and their standalone CLI.                         |
+| `migration`  | Schema migrations and their standalone CLI.                          |
 
-### Where code goes — `api` crate
+### The `api` crate
 
-| Module        | Responsibility                                                      |
-| ------------- | ------------------------------------------------------------------- |
-| `dto/`        | Wire format: request payloads and response bodies.                  |
-| `error.rs`    | The single `ApiError` type; every handler returns `ApiResult<T>`.   |
+| Module        | Responsibility                                                       |
+| ------------- | -------------------------------------------------------------------- |
+| `dto/`        | Wire format: request payloads and response bodies.                   |
+| `error.rs`    | The single `ApiError` type; every handler returns `ApiResult<T>`.    |
 | `extract.rs`  | Crate-local extractors (`Json`, `Path`) rejecting through `ApiError`. |
 | `handler/`    | Business handlers only: extract input, call a service, map the result. |
 | `middleware/` | Cross-cutting layers: one module per concern, composed in `middleware::apply` via `tower::ServiceBuilder`. |
 | `router/`     | The only place where URLs are declared; also hosts the technical endpoints (health probes, 404 fallback) and the OpenAPI document (`ApiDoc` + Swagger UI). |
-| `server.rs`   | HTTP server bootstrap (`Server::new(addr, conn).run()`).            |
+| `server.rs`   | HTTP server bootstrap (`Server::new(addr, conn).run()`).             |
 | `service/`    | Business logic, split between `Query` (reads) and `Mutation` (writes). |
-| `state.rs`    | `AppState`, the dependencies shared with every handler.             |
+| `state.rs`    | `AppState`, the dependencies shared with every handler.              |
 
-Hard rules:
+### Hard rules
 
 - Handlers never touch the database directly: they go through `service/`.
-- New failure modes become variants of `ApiError`, never ad-hoc status codes.
-- The API speaks JSON only: every response body, success or failure,
-  health probes included, is JSON — never plain text. Failures (404
-  fallback, extractor rejections, caught panics, probe failures) use the
-  single `{ "error": ... }` envelope. Handlers take their inputs through
-  `crate::extract::{Json, Path}`, never through the stock `axum::Json` /
-  `axum::extract::Path`.
+- New failure modes become variants of `ApiError` (one match arm each),
+  never ad-hoc status codes.
+- The API speaks **JSON only**: every response body, success or failure,
+  health probes included. Failures use the single `{ "error": ... }`
+  envelope. Handlers take their inputs through `crate::extract::{Json,
+  Path}`, never the stock axum extractors.
+- Every endpoint is part of the OpenAPI contract: annotate the handler with
+  `#[utoipa::path]` and register it in `ApiDoc`'s `paths(...)`
+  (`router/mod.rs`). Swagger UI is on `/docs`, the document on
+  `/api-docs/openapi.json`; an endpoint missing from `ApiDoc` counts as
+  undocumented.
 - Health endpoints (`/livez`, `/readyz`, `/healthz`) follow the Kubernetes
-  probe conventions and stay at the root, outside any versioned prefix.
-  They are defined in `router/`, not in `handler/`: `handler/` is reserved
-  for business resources.
-- Every endpoint is part of the OpenAPI contract: annotate its handler
-  with `#[utoipa::path]` and register it in the `paths(...)` list of
-  `ApiDoc` (in `router/mod.rs`). Swagger UI is served on `/docs`,
-  the generated document on `/api-docs/openapi.json`; an endpoint missing
-  from `ApiDoc` is invisible there and counts as undocumented.
-- Middlewares do one thing each: prefer `tower-http`'s layers, use
-  `axum::middleware::from_fn` for simple internal logic, and write a full
-  `tower::Layer`/`Service` pair only for configurable/publishable
-  middleware. Register every layer in `middleware::apply` (ServiceBuilder,
-  top-to-bottom execution), never with scattered `Router::layer` calls.
-
-### Where code goes — other crates
-
-- **Configuration** is modelled in `common/src/config.rs` as typed structs
-  (no `App` prefix). Every key has a default, overridden in order by the
-  optional system file `/etc/ipam/app-config.json` (FHS path for the
-  Debian 13 / Docker deployment target), an optional local
-  `app-config.json` (JSON only, never committed), then `APP_*`
-  environment variables with `__` as nesting separator
-  (e.g. `APP_DATABASE__POOL__MAX_CONNECTIONS=50`). Settings classified as
-  secrets (passwords, tokens, keys) are wrapped in `secrecy::SecretString`:
-  `Debug` redacts them, and the value is read with `expose_secret()` only
-  at its single point of final consumption — never stored, logged or
-  passed around in clear.
-- **Infrastructure helpers** (one module per external system) live in
-  `common/src/infrastructure/`; they consume their own section of the
-  configuration tree (e.g. `postgresql::connect(&config.database)`).
-- **Telemetry** is initialised once via `common::telemetry::init(debug)`;
-  `APP_DEBUG=true` selects DEBUG verbosity, `RUST_LOG` always wins.
-- **Migrations** live in `migration/src/source/`, one module named
-  `mYYYYMMDD_NNNNNN_<label>`, registered chronologically in
-  `Migrator::migrations`. Never edit, reorder or delete a migration that
-  has shipped: add a new one. Migrations run automatically at boot; the
-  CLI (`cargo run -p migration -- <command>`) uses the same configuration
-  as the API.
-- **Database entities** go to the `entity` crate (`entity/src/`, one
-  module per table), re-exported in `entity/src/prelude.rs` — the single
-  home for data models; the `api` crate defines no entity of its own.
-- **Cron jobs** live in `cron/src/job/`, one module per job: a unit
-  struct implementing the `Job` trait (`name`, hard-coded `schedule`,
-  async `run(&self, state) -> JobResult`), added to `job::roster`, the
-  single list loaded at boot. Schedules are behavior: they belong to code
-  review, not to runtime configuration. The cron wiring (`into_cron_job`,
-  `execute`) is generic — never duplicate it in a job. Long-lived
-  components (API, cron engine) are spawned side by side in `src/main.rs`
-  and must accept a shutdown future so SIGTERM/SIGINT stops them
-  gracefully.
+  probe conventions, stay at the root outside any versioned prefix, and are
+  defined in `router/`, not `handler/`.
+- Middlewares do one thing each and are registered in `middleware::apply`
+  (ServiceBuilder, top-to-bottom execution) — never scattered
+  `Router::layer` calls.
+- **Configuration** is modelled in `common/src/config.rs` as typed structs;
+  every key has a default, overridden by the optional
+  `/etc/ipam/app-config.json`, an optional local `app-config.json` (never
+  committed), then `APP_*` environment variables (`__` separator). Secrets
+  are `secrecy::SecretString`, read with `expose_secret()` only at the
+  single point of final consumption. Document every variable in
+  `.env.example`.
+- **Database entities** go to the `entity` crate, re-exported in
+  `entity/src/prelude.rs`; the `api` crate defines no entity of its own.
+- **Migrations**: one module `mYYYYMMDD_NNNNNN_<label>` in
+  `migration/src/source/`, registered chronologically in
+  `Migrator::migrations`. Never edit, reorder or delete a shipped
+  migration: append a new one.
+- **Cron jobs**: a unit struct implementing the `Job` trait in
+  `cron/src/job/`, added to `job::roster()`. Schedules are hard-coded —
+  they are behavior, reviewed in code, not runtime configuration.
 
 ## Code standards
 
-These are enforced by the toolchain — CI and `just ci` fail otherwise:
+Enforced by the toolchain — CI and `just ci` fail otherwise:
 
-- **No unsafe code.** `unsafe_code = "forbid"` is set workspace-wide.
-  If a dependency seems to require `unsafe`, find another design.
+- **No unsafe code.** `unsafe_code = "forbid"` is set workspace-wide. If a
+  dependency seems to require `unsafe`, find another design.
 - **Everything is documented, in English.** `missing_docs` and
   `clippy::missing_docs_in_private_items` warn, and lints are errors in the
-  quality gate. Every crate, module, type, field and function carries
-  rustdoc (`//!` / `///`). Comments explain *why*, not *what*: a comment
-  paraphrasing the line below it is noise.
-- **Formatting and lints are non-negotiable.** `cargo fmt` (see
-  `rustfmt.toml`) and `cargo clippy --workspace --all-targets` with zero
-  warnings (see `clippy.toml`, MSRV 1.97).
+  gate. Comments explain *why*, not *what*.
+- **Formatting and lints are non-negotiable.** `cargo fmt`
+  (`rustfmt.toml`) and `cargo clippy --workspace --all-targets` with zero
+  warnings (`clippy.toml`, MSRV 1.97).
 - **Dependencies** are declared once in `[workspace.dependencies]` and
-  inherited with `workspace = true`. Features are added at the crate that
-  needs them. Do not pin versions in member crates.
+  inherited with `workspace = true`; features are added at the crate that
+  needs them. Stable versions only — no release candidates.
 
-## Development workflow
+## Branching model
 
-### Branching model
+- `main` is the **only long-lived branch** and the release branch: land
+  changes via pull request, never push directly.
+- Branch off `main` for every change: `<type>/<short-topic>` where
+  `<type>` is the Conventional Commit type (`feat/subnet-allocation`,
+  `fix/readyz-timeout`, `ci/cache-key`).
+- Keep branches focused and short-lived; delete them after the merge (the
+  repository does it automatically).
 
-`main` is the only long-lived branch and is protected: **nothing is
-pushed to it directly**. Every change follows the same cycle:
+## Commit conventions
 
-1. Branch off `main`: `<type>/<short-topic>` where `<type>` is the
-   Conventional Commit type of the change (`feat/subnet-allocation`,
-   `fix/readyz-timeout`, `ci/cache-key`).
-2. Open a pull request targeting `main`. The `ci` workflow runs the
-   quality gate on it; the PR title must be a Conventional Commit — with
-   squash merge it becomes the commit on `main`.
-3. Merge by **squash** once the gate is green. Delete the branch.
-
-Releases close the loop automatically: release-please watches `main`,
-maintains the release PR, and tags when it merges — same cycle, no
-manual step.
-
-### Daily commands
-
-Recipes are defined in the `justfile`:
-
-```sh
-just            # list recipes
-just run        # config -> database -> migrations -> HTTP server
-just migrate    # sea-orm-migration CLI (up, down, status, ...)
-just ci         # full quality gate: fmt-check + clippy -D warnings + tests
-```
-
-Run `just ci` before every commit. A change that does not pass the gate is
-not finished.
-
-### Git hooks (optional, recommended)
-
-`just hooks` installs the [lefthook](https://lefthook.dev) hooks defined
-in `lefthook.yml`, tiered by cost: fmt/clippy/check at pre-commit (in
-parallel, skipped on non-Rust commits), Conventional Commits validation
-at commit-msg (via [committed](https://github.com/crate-ci/committed),
-rules in `committed.toml`), and the test suite at pre-push. They are a
-local convenience — the authority remains `just ci` and the CI gate.
-Anything slower than pre-push belongs in CI, not in a hook.
-
-## Commits — Conventional Commits
-
-Commit messages **must** follow
+Commits **must** follow
 [Conventional Commits v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).
-This is not cosmetic: [release-please](https://github.com/googleapis/release-please)
-parses the history to compute the next version and generate the changelog,
-so a malformed message corrupts the release pipeline.
-
-Format:
+This is not stylistic:
+[release-please](https://github.com/googleapis/release-please) derives the
+next version and the changelog directly from the commit types, and the
+`commit-msg` hook rejects non-conforming messages locally.
 
 ```
-<type>(<scope>): <description>
+<type>(<optional scope>): <description>
 
 [optional body]
 
 [optional footer(s)]
 ```
 
-- **Types**: `feat` (new capability, minor bump), `fix` (bug fix, patch
-  bump), plus `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
-- **Scope**: the crate touched (`api`, `common`, `cron`, `entity`,
-  `migration`) or a meaningful area (`config`, `telemetry`, `router`, ...).
-- **Breaking changes**: append `!` after the type/scope **and** add a
-  `BREAKING CHANGE:` footer explaining the migration path (major bump).
-- Description in the imperative mood, lower case, no trailing period.
+| Type       | Use for                                               | Release effect |
+| ---------- | ----------------------------------------------------- | -------------- |
+| `feat`     | A new user-facing capability                          | minor bump     |
+| `fix`      | A bug fix                                             | patch bump     |
+| `docs`     | Documentation only                                    | none           |
+| `refactor` | Code change that neither fixes nor adds behavior      | none           |
+| `perf`     | A performance improvement                             | none           |
+| `test`     | Adding or fixing tests                                | none           |
+| `build`    | Build system, dependencies, packaging                 | none           |
+| `ci`       | CI/CD configuration                                   | none           |
+| `chore`    | Maintenance that fits nothing above                   | none           |
 
-Examples:
+Rules that trip people up:
+
+- Description in the **imperative mood, lower case, no trailing period**.
+- Scope = the crate touched (`api`, `common`, `cron`, `entity`,
+  `migration`) or a meaningful area (`config`, `router`, `deps`, ...).
+- **Breaking changes**: `!` after the type/scope **and** a
+  `BREAKING CHANGE:` footer explaining the migration path → major bump.
 
 ```
 feat(api): add subnet allocation endpoint
@@ -196,14 +175,76 @@ BREAKING CHANGE: the `address` table is now `subnet_address`;
 re-run migrations from a clean database or apply the new revision.
 ```
 
+## Git hooks
+
+Installed by `just hooks` (lefthook, definitions in `lefthook.yml`),
+tiered by cost:
+
+- **`pre-commit`** → `cargo fmt --check`, `cargo clippy -D warnings`,
+  `cargo check`, in parallel, skipped when no Rust file is staged.
+- **`commit-msg`** → [committed](https://github.com/crate-ci/committed)
+  validates the Conventional Commit format (rules in `committed.toml`).
+- **`pre-push`** → the test suite (`cargo test --workspace`).
+
+Do not disable hooks. `git commit --no-verify` exists for genuine
+emergencies only — a malformed message will still break the release
+pipeline later, in everyone's face instead of yours.
+
+## Pull requests
+
+1. Push your branch and open a PR against `main`.
+2. The `ci` workflow runs the quality gate (`just ci`) on the
+   organization's self-hosted runners. It must pass.
+3. Keep the PR **title** Conventional-Commit-shaped: the repository
+   squash-merges, so the title becomes the commit that release-please
+   reads on `main`.
+4. Merge by **squash** once the gate is green; the branch is deleted
+   automatically.
+
+Dependabot PRs follow the same flow: minor/patch updates are auto-merged
+once checks pass (`ci-update` workflow); majors wait for a human.
+
+## Release & deployment
+
+Versioning is automated, **publishing the image is a deliberate action**:
+
+1. On every merge to `main`, release-please opens or updates a **release
+   PR** accumulating changes and the computed version (all six crate
+   versions and `Cargo.lock` bump in lockstep).
+2. Merging that release PR tags `vX.Y.Z`, publishes the GitHub release and
+   updates `CHANGELOG.md` — nothing is deployed.
+3. The `release` workflow then builds the hardened image and pushes it to
+   Docker Hub (`aartintelligent/ipam`) with the `X.Y.Z`, `X.Y` and `latest`
+   tags. Releases created by the default `GITHUB_TOKEN` do not trigger it
+   automatically (GitHub loop protection): run it manually —
+   `gh workflow run release.yaml -f tag=vX.Y.Z` — or give release-please a
+   PAT to make the chain fully automatic.
+
+Do not bump versions or edit the changelog by hand — version state lives in
+`.release-please-manifest.json` and `release-please-config.json`. Crate
+versions are **literal on purpose** (`version = "x.y.z"` in every crate,
+not `version.workspace = true`): release-please's rust updater can only
+rewrite literal strings.
+
+### Infrastructure prerequisites
+
+- **Self-hosted runners** — every workflow targets `runs-on: self-hosted`
+  (the organization's "default" runner group). The runners need the `gh`
+  CLI (auto-merge) and a Docker daemon with BuildKit (image builds); the
+  quality gate bootstraps rustup itself if missing.
+- **Registry credentials** — `DHI_USERNAME` / `DHI_PASSWORD` repository
+  secrets: the same Docker ID pulls the hardened base images from `dhi.io`
+  and pushes to Docker Hub, so the token needs write access on the
+  namespace.
+
 ## Notes for AI agents
 
-- This file is the contract: read it before writing code, follow the
-  layout table when deciding where a file goes, and keep every gate green.
+- This file is the contract for **process**; `ARCHITECTURE.md` is the
+  reference for **design**. Read both before writing code; keep every gate
+  green and report failures honestly.
 - Never introduce `unsafe`, undocumented items, or a dependency pinned
   outside `[workspace.dependencies]`.
 - Never modify a shipped migration; always append a new one.
-- Always run `just ci` (or the equivalent cargo commands) before declaring
-  work done, and report failures honestly.
-- Write commit messages in Conventional Commits form so release automation
-  keeps working.
+- Write commit messages and PR titles in Conventional Commits form so the
+  release automation keeps working.
+- Respect the git hooks; do not commit with `--no-verify`.
