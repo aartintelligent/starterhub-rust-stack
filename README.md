@@ -84,6 +84,6 @@ recipe (`check`, `lint`, `test`, `migrate`, `ci`, ...).
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
 | Understand how the service is designed                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                            |
 | Add an endpoint, a cron job, a migration, a config key   | [`ARCHITECTURE.md`](./ARCHITECTURE.md) → *Extending the service*  |
-| Know where a new file belongs                            | [`CONTRIBUTING.md`](./CONTRIBUTING.md) → *Where code goes*        |
+| Know where a new file belongs                            | [`ARCHITECTURE.md`](./ARCHITECTURE.md) → *The workspace at a glance* |
 | Branch, commit, open a PR, release and publish the image | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                            |
 | Condensed notes for AI coding agents                     | [`CLAUDE.md`](./CLAUDE.md)                                        |
