@@ -20,3 +20,11 @@ comment:
   layout: "condensed_header, diff, files"
   behavior: default
   require_changes: true
+
+# Binary entry points: their process wiring (signal handlers, CLI
+# delegation) is only exercised by running the real program, and the
+# logic they call lives in the tested library crates. Kept in sync with
+# the exclusion in the justfile coverage recipes.
+ignore:
+  - "src/main.rs"
+  - "migration/src/main.rs"
