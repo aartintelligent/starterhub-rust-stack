@@ -88,7 +88,9 @@ jobs:
           password: ${{ secrets.DHI_PASSWORD }}
 
       # Derives the image tags from the release tag (vX.Y.Z): the exact
-      # version, the moving X.Y, and latest.
+      # version, the moving X.Y, and latest. `latest` only moves on a
+      # real release event: a manual rebuild of an old tag must never
+      # repoint it backwards.
       - uses: docker/metadata-action@v6
         id: meta
         with:
@@ -96,7 +98,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
 
       - uses: docker/build-push-action@v7
         with:
