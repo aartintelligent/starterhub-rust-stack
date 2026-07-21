@@ -91,7 +91,9 @@ jobs:
       # CODECOV_TOKEN repository secret (from codecov.io, Settings >
       # Secrets and variables > Actions). A failed upload fails the job:
       # a silent failure would freeze the reported coverage and hide
-      # regressions behind a stale number.
+      # regressions behind a stale number. Public-repository note: fork
+      # PRs run without secrets, the action then falls back to tokenless
+      # uploads, which Codecov accepts for public repositories.
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

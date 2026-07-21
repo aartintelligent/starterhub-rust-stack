@@ -11,10 +11,11 @@
 # default GITHUB_TOKEN, so the whole path — merge the release PR, tag,
 # build, publish — is automatic and needs no personal access token.
 #
-# Note: PRs opened with the default GITHUB_TOKEN do not trigger other
-# workflows (the same loop protection). If the `ci` workflow must run on
-# release PRs, replace the token below with a fine-grained PAT stored as
-# a repository secret.
+# The action authenticates with AUTOMATION_TOKEN (an optional
+# fine-grained PAT, see CONTRIBUTING.md) when present, so the release PR
+# it opens triggers the `ci` workflow like any other PR. With the
+# default GITHUB_TOKEN fallback everything still works, but GitHub's
+# loop protection keeps CI from running on release PRs.
 name: release-please
 
 on:
@@ -36,7 +37,7 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Ship the image of the release that was just tagged. `latest=true`
       # because this path only ever runs for the newest release; manual

@@ -34,6 +34,12 @@ on:
 permissions:
   contents: read
 
+# One run per ref, same policy as the ci workflow: a new push cancels
+# the previous run on branches, never on main or the weekly schedule.
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   deny:
     name: cargo deny
