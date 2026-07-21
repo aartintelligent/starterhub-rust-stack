@@ -35,3 +35,6 @@ workspace = true
 # global state, and `std::env::set_var` is unsafe in edition 2024 —
 # forbidden workspace-wide.
 temp-env = { workspace = true }
+
+# Async runtime for the connectivity test of the PostgreSQL bootstrap.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

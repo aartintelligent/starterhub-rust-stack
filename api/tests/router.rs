@@ -8,7 +8,7 @@
 use std::time::Duration;
 
 use api::error::ApiResult;
-use api::extract::Json;
+use api::extract::{Json, Path};
 use api::middleware;
 use api::router::router;
 use api::state::AppState;
@@ -17,7 +17,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use axum::routing::{get, post};
 use sea_orm::{DatabaseBackend, MockDatabase};
-use serde_json::Value;
+use serde_json::{Value, json};
 use tower::util::ServiceExt;
 
 /// Builds the application router backed by a mock database.
@@ -27,9 +27,20 @@ fn app(docs: bool) -> Router {
     router(AppState::new(conn), docs, "under-test")
 }
 
+/// Installs a global TRACE-level test subscriber (first caller wins) so
+/// the log statements of the exercised paths are fully evaluated.
+fn init_tracing() {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .with_test_writer()
+        .try_init();
+}
+
 /// Sends `request` through `router` and returns the status plus the body
 /// parsed as JSON (`Value::Null` for an empty body, e.g. redirects).
 async fn call(router: Router, request: Request<Body>) -> (StatusCode, Value) {
+    init_tracing();
+
     let response = router.oneshot(request).await.expect("router is infallible");
     let status = response.status();
 
@@ -175,6 +186,55 @@ async fn oversized_body_rejects_through_envelope() {
     assert!(body["error"].is_string(), "rejection must use the envelope");
 }
 
+/// `/readyz` answers `503` through the envelope when the database is
+/// unreachable, without restarting the pod (no 5xx from the router).
+#[tokio::test]
+async fn readyz_answers_503_when_database_unreachable() {
+    // A lazy pool aimed at a closed port: construction succeeds, the ping
+    // fails — exactly the shape of a database outage at runtime.
+    let pool = sea_orm::sqlx::postgres::PgPoolOptions::new()
+        .acquire_timeout(Duration::from_millis(100))
+        .connect_lazy("postgres://user:secret@127.0.0.1:1/app")
+        .expect("lazy pools build without connecting");
+    let conn = sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(pool);
+
+    let app = router(AppState::new(conn), false, "under-test");
+    let (status, body) = call(app, get_request("/readyz")).await;
+
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"], "database unreachable");
+}
+
+/// Echoes a typed path parameter back, exercising the crate-local `Path`
+/// extractor and its rejection path.
+async fn item(Path(id): Path<u32>) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "id": id })))
+}
+
+/// Minimal router around [`item`].
+fn item_app() -> Router {
+    Router::new().route("/item/{id}", get(item))
+}
+
+/// A well-typed path parameter extracts and echoes back.
+#[tokio::test]
+async fn typed_path_parameter_extracts() {
+    let (status, body) = call(item_app(), get_request("/item/42")).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["id"], 42);
+}
+
+/// An unparsable path parameter rejects through the `ApiError` envelope
+/// with the status carried by the rejection.
+#[tokio::test]
+async fn malformed_path_parameter_rejects_through_envelope() {
+    let (status, body) = call(item_app(), get_request("/item/not-a-number")).await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].is_string(), "rejection must use the envelope");
+}
+
 /// A handler slower than the configured timeout answers a JSON `408`.
 #[tokio::test]
 async fn slow_request_answers_json_408() {
@@ -193,4 +253,37 @@ async fn slow_request_answers_json_408() {
 
     assert_eq!(status, StatusCode::REQUEST_TIMEOUT);
     assert_eq!(body["error"], "request timed out");
+}
+
+/// A panicking handler answers an opaque JSON `500` — whatever the shape
+/// of the panic payload — instead of tearing down the connection.
+#[tokio::test]
+async fn panicking_handler_answers_json_500() {
+    /// Handler panicking with the usual `&'static str` payload.
+    async fn panics_str() -> &'static str {
+        panic!("boom");
+    }
+
+    /// Handler panicking with a formatted `String` payload.
+    async fn panics_string() -> &'static str {
+        panic!("boom {}", 42);
+    }
+
+    /// Handler panicking with a payload that is neither string type.
+    async fn panics_opaque() -> &'static str {
+        std::panic::panic_any(42)
+    }
+
+    let routes = Router::new()
+        .route("/panic-str", get(panics_str))
+        .route("/panic-string", get(panics_string))
+        .route("/panic-opaque", get(panics_opaque));
+
+    for uri in ["/panic-str", "/panic-string", "/panic-opaque"] {
+        let app = middleware::apply(routes.clone(), Duration::from_secs(5));
+        let (status, body) = call(app, get_request(uri)).await;
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{uri}");
+        assert_eq!(body["error"], "internal server error", "{uri}");
+    }
 }

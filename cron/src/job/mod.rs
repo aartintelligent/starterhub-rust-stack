@@ -85,3 +85,117 @@ async fn execute(job: &dyn Job, state: &AppState) {
         Err(error) => tracing::error!(job = job.name(), error = %error, "job failed"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests of the private job wiring: the reference `hello` job,
+    //! the outcome telemetry of [`execute`] and the schedule validation
+    //! in [`into_cron_job`]. The happy registration path is covered end
+    //! to end by the engine lifecycle integration test.
+
+    use std::time::Duration;
+
+    use sea_orm::{DatabaseBackend, MockDatabase};
+    use tokio::sync::Notify;
+
+    use super::*;
+    use crate::error::JobError;
+
+    /// Job failing on purpose, on an invalid schedule on purpose.
+    struct Failing;
+
+    #[async_trait::async_trait]
+    impl Job for Failing {
+        fn name(&self) -> &'static str {
+            "failing"
+        }
+
+        fn schedule(&self) -> &'static str {
+            "not a cron expression"
+        }
+
+        async fn run(&self, _state: &AppState) -> JobResult {
+            Err(JobError::Internal(anyhow::anyhow!("boom")))
+        }
+    }
+
+    /// Mock-backed state handed to jobs under test.
+    fn state() -> AppState {
+        // Global TRACE-level test subscriber (first caller wins), so the
+        // outcome log statements of `execute` are fully evaluated.
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_test_writer()
+            .try_init();
+
+        AppState::new(MockDatabase::new(DatabaseBackend::Postgres).into_connection())
+    }
+
+    /// The reference job declares its identity and runs successfully.
+    #[tokio::test]
+    async fn hello_declares_itself_and_runs() {
+        let job = hello::Hello;
+
+        assert_eq!(job.name(), "hello");
+        assert_eq!(job.schedule(), "0 * * * * * *");
+        assert!(job.run(&state()).await.is_ok());
+    }
+
+    /// Both outcomes convert into telemetry; a failure never propagates
+    /// out of [`execute`], so no job can take the engine down.
+    #[tokio::test]
+    async fn execute_never_propagates_the_outcome() {
+        execute(&hello::Hello, &state()).await;
+        execute(&Failing, &state()).await;
+    }
+
+    /// An invalid hard-coded schedule is rejected at adaptation time —
+    /// this is what aborts the boot instead of failing silently later.
+    #[test]
+    fn invalid_schedule_is_rejected() {
+        assert_eq!(Failing.name(), "failing");
+        assert!(into_cron_job(Arc::new(Failing), state()).is_err());
+    }
+
+    /// Job on the fastest possible schedule, signalling each execution.
+    struct Ticking(Arc<Notify>);
+
+    #[async_trait::async_trait]
+    impl Job for Ticking {
+        fn name(&self) -> &'static str {
+            "ticking"
+        }
+
+        /// Every second: the shortest wait a real engine tick allows.
+        fn schedule(&self) -> &'static str {
+            "* * * * * * *"
+        }
+
+        async fn run(&self, _state: &AppState) -> JobResult {
+            self.0.notify_one();
+
+            Ok(())
+        }
+    }
+
+    /// A registered job fires through the adapter closure end to end: the
+    /// engine ticks, the closure clones its captures and runs the body.
+    #[tokio::test]
+    async fn registered_job_fires_through_the_adapter() {
+        let fired = Arc::new(Notify::new());
+        let job = into_cron_job(Arc::new(Ticking(Arc::clone(&fired))), state())
+            .expect("the schedule is valid");
+
+        let mut scheduler = JobScheduler::new().await.expect("engine must build");
+        scheduler.add(job).await.expect("job must register");
+        scheduler.start().await.expect("engine must start");
+
+        // The schedule fires every second: five is a generous bound that
+        // keeps the test deterministic on a loaded CI runner.
+        tokio::time::timeout(Duration::from_secs(5), fired.notified())
+            .await
+            .expect("the job must fire within its schedule period");
+
+        scheduler.shutdown().await.expect("engine must stop");
+    }
+}

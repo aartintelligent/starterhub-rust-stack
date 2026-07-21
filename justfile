@@ -50,15 +50,21 @@ test:
 deny:
     cargo deny check
 
+# Binary entry points are excluded from coverage: their process wiring
+# (signal handlers, CLI delegation) is only exercised by running the real
+# program, and the logic they call lives in the tested library crates.
+# Keep in sync with the `ignore` list in codecov.yml.
+coverage-exclusions := "--ignore-filename-regex 'src/main\\.rs$'"
+
 # Coverage summary in the terminal.
 # Requires cargo-llvm-cov: `cargo install cargo-llvm-cov`.
 coverage:
-    cargo llvm-cov --workspace
+    cargo llvm-cov --workspace {{coverage-exclusions}}
 
 # Coverage in lcov format (lcov.info), consumed by the Codecov upload
 # in CI.
 coverage-lcov:
-    cargo llvm-cov --workspace --lcov --output-path lcov.info
+    cargo llvm-cov --workspace {{coverage-exclusions}} --lcov --output-path lcov.info
 
 # Run the sea-orm-migration CLI, e.g. `just migrate up`, `just migrate status`.
 migrate *args:

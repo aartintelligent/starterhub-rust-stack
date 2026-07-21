@@ -31,6 +31,7 @@ fn defaults_require_zero_setup() {
     assert!(!config.debug);
     assert_eq!(config.server.host, "127.0.0.1");
     assert_eq!(config.server.port, 8080);
+    assert_eq!(config.server.url(), "127.0.0.1:8080");
     assert_eq!(config.server.timeout, 30);
     assert_eq!(config.database.pool.idle_timeout, 600);
     assert_eq!(config.database.pool.max_lifetime, 1800);
@@ -53,6 +54,15 @@ fn env_overrides_use_single_underscore_prefix() {
     assert!(config.debug);
     assert_eq!(config.server.port, 9999);
     assert_eq!(config.database.pool.max_lifetime, 60);
+}
+
+/// A malformed override aborts the load with an error instead of booting
+/// on a half-read configuration.
+#[test]
+fn malformed_override_fails_the_load() {
+    temp_env::with_vars([("APP_SERVER__PORT", Some("not-a-port"))], || {
+        assert!(Config::load("under-test", "0.0.0").is_err());
+    });
 }
 
 /// The environment accepts the documented short and uppercase spellings.
