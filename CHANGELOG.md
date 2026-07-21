@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.7.0...v1.0.0) (2026-07-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** deployments using alias spellings for `APP_ENVIRONMENT` must switch to the canonical lowercase values.
+
+### Features
+
+* **config:** restrict environment spellings ([#39](https://github.com/aartintelligent/starterhub-rust-stack/issues/39)) ([b4b2dca](https://github.com/aartintelligent/starterhub-rust-stack/commit/b4b2dca10e0958d8d4fd48ee477ee264b06fa4e7))
+
 ## [0.7.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.6.0...v0.7.0) (2026-07-21)
 
 
