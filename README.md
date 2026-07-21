@@ -1,6 +1,6 @@
 # starterhub-rust-stack
 
-[![rust](https://img.shields.io/badge/rust-1.97-B7410E?logo=rust)](./rust-toolchain.toml)
+[![rust](https://img.shields.io/badge/rust-1.97-F74C00?logo=rust)](./rust-toolchain.toml)
 [![ci](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/ci.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/ci.yaml)
 [![audit](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/audit.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/audit.yaml)
 [![release](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/release.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/release.yaml)
