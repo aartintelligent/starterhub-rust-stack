@@ -53,5 +53,10 @@ migrate *args:
 migrate-generate name:
     cargo run -p migration -- generate {{name}}
 
+# Install the git hooks (lefthook.yml): fast pre-commit checks and
+# Conventional Commits validation. Opt-in, run once after cloning.
+hooks:
+    lefthook install
+
 # Full local quality gate, mirrors what CI should enforce.
 ci: fmt-check lint test

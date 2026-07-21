@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Lefthook — git hooks for ipam
+#
+#  Hooks are tiered by cost so the developer feedback loop stays fast:
+#    • pre-commit  — seconds, runs every commit (formatting, linting, check)
+#    • commit-msg  — instant, validates the conventional-commit format
+#    • pre-push    — heavier, only on push     (test suite)
+#
+#  Anything slower than pre-push lives in CI, not here. Hooks are a local
+#  convenience, opt-in via `just hooks` after cloning; the authority
+#  remains `just ci`, enforced by the ci workflow on every pull request.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Keep the output focused on failures: hide the meta banner and the
+# skipped-command noise.
+skip_output:
+  - meta
+  - skips
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  pre-commit — fast feedback, runs on every `git commit`
+#
+#  `parallel: true` runs fmt / clippy / check concurrently instead of
+#  serially. `glob` filters ensure a docs-only commit skips the Rust
+#  checks entirely.
+# ─────────────────────────────────────────────────────────────────────────────
+pre-commit:
+  parallel: true
+  # Merge and rebase replays would re-run the hooks on every replayed
+  # commit and produce noisy false positives.
+  skip:
+    - merge
+    - rebase
+  commands:
+    fmt:
+      glob: "*.rs"
+      # `--check` is the strict mode: refuse to commit unformatted code
+      # rather than silently auto-fixing.
+      run: cargo fmt --all -- --check
+
+    clippy:
+      glob: "*.rs"
+      # `-D warnings` promotes every workspace lint to a hard error so
+      # the local hook matches exactly what the CI gate enforces.
+      run: cargo clippy --workspace --all-targets -- -D warnings
+
+    check:
+      glob: "*.{rs,toml}"
+      # Catches Cargo.toml-level breakage (wrong feature gates, missing
+      # deps) that fmt/clippy don't see.
+      run: cargo check --workspace --all-targets
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  commit-msg — enforce Conventional Commits
+#
+#  Non-negotiable: release-please derives the next version and the
+#  changelog from these prefixes (feat:/fix:/...). A non-conformant
+#  commit slipping through silently breaks the release flow.
+# ─────────────────────────────────────────────────────────────────────────────
+commit-msg:
+  commands:
+    conventional:
+      # `committed` (crate-ci/committed) is Rust-native and reads the
+      # message file path that git passes as the first hook argument;
+      # rules live in committed.toml.
+      run: committed --commit-file {1}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  pre-push — heavier checks, only on `git push`
+#
+#  Runs the full test suite. `--no-fail-fast` keeps going after a first
+#  failure so the developer gets the complete picture before re-pushing.
+#  If this becomes too slow as the workspace grows, demote to CI-only.
+# ─────────────────────────────────────────────────────────────────────────────
+pre-push:
+  commands:
+    test:
+      run: cargo test --workspace --no-fail-fast

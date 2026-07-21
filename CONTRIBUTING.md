@@ -150,6 +150,16 @@ just ci         # full quality gate: fmt-check + clippy -D warnings + tests
 Run `just ci` before every commit. A change that does not pass the gate is
 not finished.
 
+### Git hooks (optional, recommended)
+
+`just hooks` installs the [lefthook](https://lefthook.dev) hooks defined
+in `lefthook.yml`, tiered by cost: fmt/clippy/check at pre-commit (in
+parallel, skipped on non-Rust commits), Conventional Commits validation
+at commit-msg (via [committed](https://github.com/crate-ci/committed),
+rules in `committed.toml`), and the test suite at pre-push. They are a
+local convenience — the authority remains `just ci` and the CI gate.
+Anything slower than pre-push belongs in CI, not in a hook.
+
 ## Commits — Conventional Commits
 
 Commit messages **must** follow
