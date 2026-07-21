@@ -32,12 +32,18 @@ use tokio_util::sync::CancellationToken;
 async fn main() -> anyhow::Result<()> {
     // Resolve the configuration first: every subsequent step depends on it,
     // and a malformed source must abort the boot before anything starts.
-    let config = Config::load()?;
+    // The env! macros expand HERE, in the binary crate, so the identity
+    // defaults are the real executable name and version from Cargo.toml.
+    let config = Config::load(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))?;
 
     // Install telemetry as early as possible so every later step (pool
     // creation, migrations, server, cron engine) is traced from its very
     // first event.
     telemetry::init(config.debug);
+
+    // First trace of every boot: which build is running. Invaluable in
+    // production logs when correlating an incident with a deployment.
+    tracing::info!(name = %config.name, version = %config.version, "booting");
 
     // Open the PostgreSQL pool eagerly: failing fast at boot beats
     // discovering a broken database on the first incoming request. `?`

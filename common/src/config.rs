@@ -89,6 +89,12 @@ impl Postgresql {
 /// Root of the configuration tree.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    /// Application name (`APP_NAME`), defaulting to the crate name of the
+    /// running binary.
+    pub name: String,
+    /// Application version (`APP_VERSION`), defaulting to the crate
+    /// version of the running binary — maintained by release-please.
+    pub version: String,
     /// Enables verbose telemetry (`APP_DEBUG=true` -> DEBUG level,
     /// otherwise INFO).
     pub debug: bool,
@@ -101,6 +107,12 @@ pub struct Config {
 impl Config {
     /// Loads the configuration from every source.
     ///
+    /// `name` and `version` seed the identity defaults and must come from
+    /// the **binary** crate — `Config::load(env!("CARGO_PKG_NAME"),
+    /// env!("CARGO_PKG_VERSION"))` — because those macros expand at compile
+    /// time in the calling crate: evaluated here they would describe
+    /// `common`, not the executable.
+    ///
     /// Also loads `.env` beforehand so `APP_*` variables declared there are
     /// visible; a missing `.env` or `config.json` is not an error.
     ///
@@ -108,7 +120,7 @@ impl Config {
     ///
     /// Fails if a source cannot be parsed or if a value cannot be
     /// deserialized into the target type.
-    pub fn load() -> anyhow::Result<Self> {
+    pub fn load(name: &str, version: &str) -> anyhow::Result<Self> {
         // Populate the process environment from `.env` before the builder
         // reads it; `.ok()` because a missing file is a normal setup, not
         // an error.
@@ -120,6 +132,8 @@ impl Config {
             // Layer 1 — defaults: every key gets a value so the application
             // boots with zero external setup and deserialization never
             // fails on a missing field.
+            .set_default("name", name)?
+            .set_default("version", version)?
             .set_default("debug", false)?
             .set_default("server.host", "127.0.0.1")?
             .set_default("server.port", 8080)?
