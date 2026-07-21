@@ -5,8 +5,14 @@
 # release-please-config.json and .release-please-manifest.json at the
 # repository root) and tags the release when that PR is merged.
 #
+# When a release is actually created, the second step chains the
+# `release` workflow (image build and push) through a workflow_dispatch:
+# dispatch events are exempt from GitHub's loop protection on the
+# default GITHUB_TOKEN, so the whole path — merge the release PR, tag,
+# build, publish — is automatic and needs no personal access token.
+#
 # Note: PRs opened with the default GITHUB_TOKEN do not trigger other
-# workflows (GitHub loop protection). If the `ci` workflow must run on
+# workflows (the same loop protection). If the `ci` workflow must run on
 # release PRs, replace the token below with a fine-grained PAT stored as
 # a repository secret.
 name: release-please
@@ -15,15 +21,31 @@ on:
   push:
     branches: [main]
 
+# `actions: write` lets the chain step dispatch the release workflow.
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
-    # Organization self-hosted runners (group "default").
+    # Organization self-hosted runners (group "default"); the runner
+    # must provide the `gh` CLI for the chain step.
     runs-on: self-hosted
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Ship the image of the release that was just tagged. `latest=true`
+      # because this path only ever runs for the newest release; manual
+      # rebuilds of old tags go through the same workflow without it.
+      # GH_REPO is required: this job never checks out the repository.
+      - name: Build and publish the release image
+        if: steps.release.outputs.release_created == 'true'
+        run: gh workflow run release.yaml -f tag="$TAG" -f latest=true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
