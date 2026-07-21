@@ -36,8 +36,7 @@ use crate::state::AppState;
 #[openapi(
     info(
         title = "IPAM",
-        description = "Plan, allocate and track the IP subnets and \
-                       addresses of your network, from a single place.",
+        description = "A fast IPAM API, built in Rust.",
         license(name = "MIT", identifier = "MIT")
     ),
     paths(livez, readyz),
