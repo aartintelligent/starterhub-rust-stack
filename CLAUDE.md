@@ -27,7 +27,7 @@ just migrate-generate <name>   # scaffold a migration (move the file into migrat
 
 Single test: `cargo test -p <crate> <test_name>`.
 
-The Rust version is pinned in four places that must stay in sync: `rust-toolchain.toml` (channel), root `Cargo.toml` (`rust-version`), `clippy.toml` (`msrv`), and the Dockerfile (`ARG RUST_VERSION`). Currently 1.97.
+The Rust version is pinned in five places that must stay in sync: `rust-toolchain.toml` (channel), root `Cargo.toml` (`rust-version`), `clippy.toml` (`msrv`), the Dockerfile (`ARG RUST_VERSION`), and the rust badge in `README.md`. Currently 1.97.
 
 ## Gotchas
 

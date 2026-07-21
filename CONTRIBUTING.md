@@ -17,8 +17,8 @@ rule.
 - The **Rust toolchain** is pinned in `rust-toolchain.toml` (channel,
   clippy, rustfmt) — rustup provisions it automatically on first `cargo`
   invocation. The same version is enforced in `Cargo.toml` (`rust-version`),
-  `clippy.toml` (`msrv`) and the `Dockerfile` (`ARG RUST_VERSION`): the four
-  must stay in sync.
+  `clippy.toml` (`msrv`), the `Dockerfile` (`ARG RUST_VERSION`) and shown
+  by the rust badge in `README.md`: the five must stay in sync.
 - [just](https://github.com/casey/just) — every workflow goes through the
   `justfile`.
 - **Docker** with compose — the local PostgreSQL.
