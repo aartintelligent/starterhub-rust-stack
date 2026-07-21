@@ -58,10 +58,13 @@ COPY --from=build /usr/local/bin/starterhub-rust-stack /usr/local/bin/starterhub
 
 # Containers listen on all interfaces (the pod/network boundary does the
 # isolation), and 8080 respects the nonroot >1024 port constraint baked
-# into the hardened image. Everything else keeps the application defaults
-# and stays overridable through APP_* variables or a config file mounted
-# at /etc/starterhub-rust-stack/app-config.json.
-ENV APP_SERVER__HOST=0.0.0.0 \
+# into the hardened image. The image defaults to the production
+# environment so exploration surfaces (/docs) stay off unless a
+# deployment explicitly overrides APP_ENVIRONMENT. Everything else keeps
+# the application defaults and stays overridable through APP_* variables
+# or a config file mounted at /etc/starterhub-rust-stack/app-config.json.
+ENV APP_ENVIRONMENT=production \
+    APP_SERVER__HOST=0.0.0.0 \
     APP_SERVER__PORT=8080
 
 EXPOSE 8080

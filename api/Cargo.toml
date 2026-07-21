@@ -21,7 +21,7 @@ serde      = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror  = { workspace = true }
 tokio      = { workspace = true, features = ["macros", "net", "rt-multi-thread"] }
-tower      = { workspace = true }
+tower      = { workspace = true, features = ["timeout"] }
 tower-http = { workspace = true, features = ["catch-panic", "request-id", "trace"] }
 tracing    = { workspace = true }
 utoipa     = { workspace = true, features = ["axum_extras"] }

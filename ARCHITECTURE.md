@@ -52,8 +52,8 @@ shutdown argument and stay signal-agnostic.
 ```text
 TCP
   └─ middleware::apply — one ServiceBuilder, top-to-bottom:
-       set x-request-id  →  trace span  →  propagate x-request-id  →  catch panics
-         └─ router: /livez /healthz /readyz /docs /api-docs/openapi.json + fallback
+       set x-request-id  →  trace span  →  propagate x-request-id  →  timeout  →  catch panics
+         └─ router: /livez /healthz /readyz + fallback (+ /docs, /api-docs/openapi.json in local/dev)
               └─ handler (crate::extract::{Json, Path})
                    └─ service (Query / Mutation)  →  sea-orm  →  PostgreSQL
 ```
@@ -74,9 +74,12 @@ Rules:
   (ServiceBuilder order = execution order).
 - **Health probes** (`/livez`, `/readyz`, `/healthz`) follow Kubernetes
   conventions and are defined in `router/`, not `handler/`.
+- **Every request is time-bounded**: past `server.timeout` (default 30 s)
+  the client receives a JSON `408` instead of holding a connection open.
 - **Every endpoint is part of the OpenAPI contract**: annotate the handler
   with `#[utoipa::path]` and register it in `ApiDoc` (`router/mod.rs`).
-  Swagger UI on `/docs`, document on `/api-docs/openapi.json`.
+  Swagger UI on `/docs`, document on `/api-docs/openapi.json` — both
+  mounted only when `environment` is `local` or `development`.
 
 ## Configuration
 
@@ -84,6 +87,10 @@ Typed structs in `common/src/config.rs`, merged in ascending priority:
 hard-coded defaults → optional `/etc/starterhub-rust-stack/app-config.json`
 → optional local `app-config.json` (never committed) → `APP_*` environment
 variables (`__` as nesting separator).
+
+The `environment` key (`local`, `development`, `staging`, `production`)
+drives environment-dependent behavior such as exposing `/docs`; it
+defaults to `local`, and the Docker image overrides it to `production`.
 
 Secrets are `secrecy::SecretString`, exposed with `expose_secret()` at
 exactly one place. Every variable is documented in
