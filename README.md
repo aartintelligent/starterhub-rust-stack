@@ -5,85 +5,59 @@ instantiate to begin every new service — not a demo, a **runnable,
 released, containerized service** with the boring-but-vital parts already
 solved and enforced.
 
-> [!IMPORTANT]
-> **Before contributing, read [`CONTRIBUTING.md`](./CONTRIBUTING.md).** It is
-> the binding process for this repo — the branching model, the **mandatory
-> Conventional Commit** rules (types, release effects, breaking-change
-> syntax), the lefthook git hooks, the pull-request flow and the automated
-> release pipeline.
+## 🎯 Purpose
 
-> [!TIP]
-> **New to the codebase? Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) first** —
-> a guided, human-oriented tour designed to be read top-to-bottom: how the
-> process boots and shuts down gracefully, how a request flows through the
-> middleware pipeline down to the single JSON error envelope, how
-> configuration, secrets, cron jobs and migrations work, and how code becomes
-> a container image — plus recipes for extending the service.
+Starting a new service usually means re-solving the same problems before
+the first line of business code: how it boots and stops cleanly, how it is
+configured across environments, how errors reach the caller, how the API
+is documented, how the database schema evolves, how quality is kept high,
+how versions are released and shipped. Solving them differently in every
+repository produces a fleet of services that all behave slightly
+differently.
 
-## ⚙️ Technical stack
+This project solves those problems **once**, so that every service built
+from it starts complete, behaves consistently with its siblings, and lets
+the team focus on business value from day one.
 
-![](https://img.shields.io/badge/rust-grey?logo=rust)
-![](https://img.shields.io/badge/axum-grey)
-![](https://img.shields.io/badge/sea--orm-grey)
-![](https://img.shields.io/badge/postgresql-grey?logo=postgresql)
-![](https://img.shields.io/badge/docker-grey?logo=docker)
-![](https://img.shields.io/badge/release%20please-grey?logo=googlecloud)
-![](https://img.shields.io/badge/conventional%20commits-grey?logo=conventionalcommits)
+## 💡 What you get
 
-**What's inside:** an axum HTTP API with Kubernetes-style health probes and
-a Swagger UI on `/docs` generated from the code (utoipa), a tokio cron
-engine running trait-based jobs, layered configuration with
-`secrecy`-protected credentials, sea-orm entities and migrations applied at
-boot, graceful SIGTERM/SIGINT shutdown supervised by a single cancellation
-token, strict workspace lints (`unsafe` forbidden, documentation
-mandatory), git hooks, and an automated release pipeline (Conventional
-Commits → release-please → tag + changelog → hardened Docker image).
+Functionally, a service created from this foundation:
 
-## 🏗️ Create a new stack from this template
+- **Runs out of the box** — one command starts it, with a working local
+  environment and zero manual setup.
+- **Describes itself** — an always-up-to-date, interactive documentation
+  of every endpoint, generated from the code and never out of sync.
+- **Reports its own health** — standard probes that deployment platforms
+  understand, so a broken instance is detected and replaced automatically.
+- **Fails predictably** — every error, whatever its origin, reaches the
+  caller in one single, consistent format.
+- **Runs scheduled work** — recurring background jobs live alongside the
+  service, reviewed like any other code.
+- **Keeps secrets safe** — configuration adapts to each environment, and
+  credentials can never leak into logs.
+- **Evolves its data safely** — database changes travel with the code and
+  apply themselves, so code and schema are always aligned.
+- **Stops gracefully** — restarts and deployments never cut a request
+  short.
+- **Stays healthy over time** — a strict, automated quality gate blocks
+  anything undocumented, unformatted or unsound.
+- **Releases itself** — versioning, changelog and publication of a
+  ready-to-deploy image are fully automated from the history of changes.
 
-This repository is a **GitHub template**: click **Use this template →
-Create a new repository**, then rebrand the copy — the service name lives
-in a handful of well-known places:
+## 👥 Who it is for
 
-1. `Cargo.toml` — the root `[package] name`.
-2. `Dockerfile` — the two binary paths (`target/release/<name>`,
-   `/usr/local/bin/<name>`) and the OCI labels.
-3. `common/src/config.rs` — the FHS config path (`/etc/<name>/app-config`)
-   and, if wanted, the default database name.
-4. `api/src/router/mod.rs` — the OpenAPI `title`/`description`.
-5. `.github/workflows/release.yaml` — the image repository and the
-   BuildKit builder name.
-6. `release-please-config.json` — `package-name`.
-7. `docker-compose.yaml`, `.env.example`, `lefthook.yml`, this `README.md`
-   — cosmetic mentions.
-8. Repository settings: secrets (`DHI_USERNAME`/`DHI_PASSWORD`), squash-only
-   merge, auto-merge, and self-hosted runner access.
-
-Then delete this section, rewrite the intro above for the new service, and
-start shipping business code (`ARCHITECTURE.md` → *Extending the service*).
-
-## 🚀 Getting started
-
-- The **Rust toolchain** is pinned by `rust-toolchain.toml` — rustup picks it
-  up automatically. You also need [just](https://github.com/casey/just) and
-  **Docker** (for the local PostgreSQL).
-
-```bash
-just db-up     # start PostgreSQL (docker compose) and wait until healthy
-just run       # config -> database -> migrations -> API + cron engine
-just hooks     # optional: install the git hooks (lefthook)
-```
-
-The API answers on `http://127.0.0.1:8080` — probes on `/livez` and
-`/readyz`, interactive documentation on `/docs`. `just` alone lists every
-recipe (`check`, `lint`, `test`, `migrate`, `ci`, ...).
+- **Teams** bootstrapping a new service who want production standards from
+  the first commit, not retrofitted later.
+- **Contributors** joining an existing service built on this foundation:
+  every sibling service is laid out and operated the same way.
+- **AI coding agents** working in the repository: the rules they must
+  follow are written down, enforced, and machine-checkable.
 
 ## 🧭 Where to go next
 
-| You want to…                                             | Read                                                             |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| Understand how the service is designed                   | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                            |
-| Add an endpoint, a cron job, a migration, a config key   | [`ARCHITECTURE.md`](./ARCHITECTURE.md) → *Extending the service*  |
-| Know where a new file belongs                            | [`ARCHITECTURE.md`](./ARCHITECTURE.md) → *The workspace at a glance* |
-| Branch, commit, open a PR, release and publish the image | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                            |
-| Condensed notes for AI coding agents                     | [`CLAUDE.md`](./CLAUDE.md)                                        |
+| You want to…                                              | Read                                                                 |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| Install, run and contribute                               | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                               |
+| Understand how the service is designed                    | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                               |
+| Add an endpoint, a cron job, a migration, a config key    | [`ARCHITECTURE.md`](./ARCHITECTURE.md) → *Extending the service*     |
+| Condensed notes for AI coding agents                      | [`CLAUDE.md`](./CLAUDE.md)                                           |
