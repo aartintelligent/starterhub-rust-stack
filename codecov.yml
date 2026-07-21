@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  Codecov — thresholds and PR-comment behavior for the upload performed by
-#  the `coverage` job in .github/workflows/ci.yaml. The repository is
-#  private, so the upload authenticates with the CODECOV_TOKEN secret.
+#  the `coverage` job in .github/workflows/ci.yaml. Internal branches
+#  authenticate with the CODECOV_TOKEN secret; fork PRs upload tokenless.
 # ─────────────────────────────────────────────────────────────────────────────
 coverage:
   status:

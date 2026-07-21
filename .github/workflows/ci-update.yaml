@@ -30,9 +30,10 @@ jobs:
     # actor alone can differ on re-triggered events, and either check
     # failing means the PR is not trusted here.
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'
-    # Organization self-hosted runners (group "default"); the runner
-    # must provide the `gh` CLI.
-    runs-on: self-hosted
+    # GitHub-hosted runner (ships the `gh` CLI), never self-hosted: the
+    # workflow triggers on pull_request, and the fork-safety rule is to
+    # keep every PR-facing job off the organization's machines.
+    runs-on: ubuntu-latest
     # The wait below polls the PR checks; bound the worst case so a hung
     # sibling workflow can never pin a runner forever.
     timeout-minutes: 30

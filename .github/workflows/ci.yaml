@@ -26,10 +26,10 @@ concurrency:
 jobs:
   gate:
     name: quality gate
-    # Organization self-hosted runners (group "default"). Groups are not
-    # addressable in runs-on: jobs target labels, and the group only
-    # decides which repositories may use its runners.
-    runs-on: self-hosted
+    # GitHub-hosted runner, never self-hosted: this workflow runs on
+    # fork PRs, and code from a fork must never execute on the
+    # organization's machines. Free and unlimited on a public repository.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -61,8 +61,8 @@ jobs:
 
   coverage:
     name: coverage
-    # Organization self-hosted runners (group "default").
-    runs-on: self-hosted
+    # GitHub-hosted runner, same fork-safety rationale as the gate.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -87,13 +87,12 @@ jobs:
       - name: Build the coverage report
         run: just coverage-lcov
 
-      # The repository is private, so the upload authenticates with the
-      # CODECOV_TOKEN repository secret (from codecov.io, Settings >
-      # Secrets and variables > Actions). A failed upload fails the job:
-      # a silent failure would freeze the reported coverage and hide
-      # regressions behind a stale number. Public-repository note: fork
-      # PRs run without secrets, the action then falls back to tokenless
-      # uploads, which Codecov accepts for public repositories.
+      # Internal branches authenticate with the CODECOV_TOKEN repository
+      # secret; fork PRs run without secrets, and the action then falls
+      # back to tokenless uploads, which Codecov accepts for public
+      # repositories. A failed upload fails the job: a silent failure
+      # would freeze the reported coverage and hide regressions behind a
+      # stale number.
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

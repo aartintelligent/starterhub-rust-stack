@@ -30,9 +30,10 @@ permissions:
 
 jobs:
   release-please:
-    # Organization self-hosted runners (group "default"); the runner
-    # must provide the `gh` CLI for the chain step.
-    runs-on: self-hosted
+    # GitHub-hosted runner (ships the `gh` CLI): the job is a handful of
+    # API calls, not worth an organization machine. Only the image build
+    # (the `release` workflow) stays on the self-hosted runners.
+    runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
