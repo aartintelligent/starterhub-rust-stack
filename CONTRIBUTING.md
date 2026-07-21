@@ -186,11 +186,13 @@ rewrite literal strings.
 - **Coverage upload** — the `CODECOV_TOKEN` repository secret (the
   repository upload token from codecov.io), used by internal branches;
   fork PRs upload tokenless.
-- **`AUTOMATION_TOKEN`** (optional) — a fine-grained PAT (contents and
-  pull requests, read/write) used by release-please and the Dependabot
-  merge. Without it everything still works on the default
-  `GITHUB_TOKEN`, but GitHub's loop protection then keeps CI from
-  running on release PRs and on the pushes those merges produce.
+- **`RELEASE_PAT`** — the organization-level secret holding a
+  fine-grained PAT (contents and pull requests, read/write, this
+  repository included) used by release-please and the Dependabot merge.
+  It must stay valid: an expired token fails those workflows outright,
+  while a missing secret only falls back to the default `GITHUB_TOKEN`
+  (GitHub's loop protection then keeps CI from running on release PRs
+  and on the pushes those merges produce). Renew it before expiry.
 
 ### Public repository posture
 

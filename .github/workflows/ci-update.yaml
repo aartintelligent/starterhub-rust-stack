@@ -10,7 +10,7 @@
 # and branch protection is enabled: the merge then simply happens after
 # the same checks it just watched.
 #
-# The merge authenticates with AUTOMATION_TOKEN (an optional
+# The merge authenticates with RELEASE_PAT (the organization-level
 # fine-grained PAT, see CONTRIBUTING.md) when present, so the push to
 # main triggers the downstream workflows (ci, audit, release-please).
 # With the default GITHUB_TOKEN fallback the merge still works, but
@@ -84,4 +84,4 @@ jobs:
         run: gh pr merge --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
