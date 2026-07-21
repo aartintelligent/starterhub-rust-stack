@@ -40,3 +40,13 @@ features = [
     # "sqlx-sqlite",
 ]
 workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tower = { workspace = true, features = ["util"] }
+
+# `mock` provides the in-memory database the integration tests hand to
+# `AppState`, so the HTTP surface is testable without a live PostgreSQL.
+[dev-dependencies.sea-orm]
+features = ["mock"]
+workspace = true
