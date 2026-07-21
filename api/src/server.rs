@@ -25,6 +25,8 @@ pub struct Server {
     addr: String,
     /// Database handle shared with every handler through [`AppState`].
     conn: DatabaseConnection,
+    /// Runtime application identity, used as the OpenAPI document title.
+    name: String,
     /// Whether the interactive documentation (`/docs`) is mounted; the
     /// binary decides from the deployment environment.
     docs: bool,
@@ -36,17 +38,19 @@ impl Server {
     /// Creates a server bound to `addr` once [`run`](Self::run) is called.
     ///
     /// The server stays configuration-agnostic on purpose: it receives
-    /// plain values (`docs`, `timeout`), and the binary crate maps the
-    /// configuration onto them.
+    /// plain values (`name`, `docs`, `timeout`), and the binary crate
+    /// maps the configuration onto them.
     pub fn new(
         addr: impl Into<String>,
         conn: DatabaseConnection,
+        name: impl Into<String>,
         docs: bool,
         timeout: Duration,
     ) -> Self {
         Self {
             addr: addr.into(),
             conn,
+            name: name.into(),
             docs,
             timeout,
         }
@@ -70,7 +74,7 @@ impl Server {
         // half-initialized server can ever be observed. The middleware
         // stack wraps the finished router so it covers every route.
         let app = middleware::apply(
-            router::router(AppState::new(self.conn), self.docs),
+            router::router(AppState::new(self.conn), self.docs, &self.name),
             self.timeout,
         );
 

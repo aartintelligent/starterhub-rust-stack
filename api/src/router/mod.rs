@@ -39,7 +39,7 @@ use crate::state::AppState;
         description = "A fast web service, built in Rust.",
         license(name = "MIT", identifier = "MIT")
     ),
-    paths(livez, readyz),
+    paths(livez, healthz, readyz),
     tags(
         (name = "probe", description = "Kubernetes health probes")
     )
@@ -51,13 +51,14 @@ struct ApiDoc;
 /// Health endpoints follow the Kubernetes probe conventions: `/livez` and
 /// its legacy alias `/healthz` for liveness, `/readyz` for readiness.
 /// When `docs` is true, Swagger UI is served on `/docs`, backed by the
-/// generated document at `/api-docs/openapi.json`.
-pub fn router(state: AppState, docs: bool) -> Router {
+/// generated document at `/api-docs/openapi.json`, titled with the
+/// runtime application identity (`name`).
+pub fn router(state: AppState, docs: bool, name: &str) -> Router {
     let router = Router::new()
         // Probes stay at the root, outside any versioned prefix: their
         // paths are contractual for the orchestrator and must survive API
         // evolutions. `/healthz` is kept as the legacy alias of `/livez`.
-        .route("/healthz", get(livez))
+        .route("/healthz", get(healthz))
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
         // Unknown paths answer with the JSON error envelope instead of
@@ -70,7 +71,14 @@ pub fn router(state: AppState, docs: bool) -> Router {
     // JSON-only rule targets API responses, and the underlying contract
     // (`/api-docs/openapi.json`) is JSON like everything else.
     let router = if docs {
-        router.merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        // The document carries the compile-time annotations, but the
+        // title follows the runtime identity (`config.name`): a service
+        // instantiated from the template never advertises the template's
+        // name.
+        let mut doc = ApiDoc::openapi();
+        doc.info.title = name.to_owned();
+
+        router.merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", doc))
     } else {
         router
     };
@@ -97,6 +105,24 @@ pub fn router(state: AppState, docs: bool) -> Router {
 )]
 async fn livez() -> (StatusCode, Json<Value>) {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
+}
+
+/// Legacy liveness alias of [`livez`].
+///
+/// Kept as a distinct handler so the alias appears in the OpenAPI
+/// contract on its own path — every routed endpoint is documented, the
+/// alias included.
+#[utoipa::path(
+    get,
+    path = "/healthz",
+    tag = "probe",
+    responses(
+        (status = OK, description = "Process is alive (legacy alias of /livez)", body = Value,
+         example = json!({ "status": "ok" }))
+    )
+)]
+async fn healthz() -> (StatusCode, Json<Value>) {
+    livez().await
 }
 
 /// Readiness probe: reports whether the service can handle traffic.
