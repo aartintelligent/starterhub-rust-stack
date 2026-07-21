@@ -1,14 +1,22 @@
 # Release artifacts.
 #
 # Builds the production image from the Dockerfile and pushes it to
-# Docker Hub (docker.io/aartintelligent/starterhub-rust-stack) when a release is
-# published (by release-please) — plus a manual trigger for reruns.
+# Docker Hub (docker.io/aartintelligent/starterhub-rust-stack).
 #
-# The manual trigger takes the release tag as an input and runs from
-# main on purpose: a workflow_dispatch executes the workflow file as it
-# exists at the dispatched ref, so dispatching on an old tag would
-# resurrect an outdated workflow. Dispatching from main with the tag as
-# input always uses the current workflow against the tagged sources.
+# Two entry points, one job:
+#   - The automatic chain: the release-please workflow dispatches this
+#     one (tag + latest=true) right after tagging a release, so every
+#     release ships its image with no human step.
+#   - The manual dispatch: rebuild any past tag. It does NOT move
+#     `latest` unless explicitly asked, so rebuilding an old version can
+#     never repoint it backwards: `latest` follows the newest release
+#     only.
+#
+# Dispatches run from main on purpose: a workflow_dispatch executes the
+# workflow file as it exists at the dispatched ref, so dispatching on an
+# old tag would resurrect an outdated workflow. Dispatching from main
+# with the tag as input always uses the current workflow against the
+# tagged sources.
 #
 # Caching strategy — two complementary layers, because the "default"
 # runner group has many machines and a job may land on any of them:
@@ -29,9 +37,11 @@
 #     dhi.io (pull) and docker.io (push); the token behind DHI_PASSWORD
 #     therefore needs write access on the aartintelligent namespace.
 #   - Releases created with the default GITHUB_TOKEN do not trigger
-#     other workflows (GitHub loop protection). For this workflow to
-#     fire automatically on release, run release-please with a PAT; the
-#     workflow_dispatch trigger is the fallback until then.
+#     other workflows (GitHub loop protection) — which is why the
+#     automatic path is a workflow_dispatch chained by the release-please
+#     workflow: dispatch events are exempt from that protection. The
+#     `release: published` trigger is kept so a release created with a
+#     PAT or by hand still ships its image.
 name: release
 
 on:
@@ -43,6 +53,11 @@ on:
         description: "Release tag to build (e.g. v0.2.0)"
         required: true
         type: string
+      latest:
+        description: "Also move the latest tag (the automatic release chain enables this; leave off when rebuilding an old tag)"
+        required: false
+        default: false
+        type: boolean
 
 # Read-only token: the image goes to Docker Hub, nothing is written on
 # the GitHub side.
@@ -89,8 +104,9 @@ jobs:
 
       # Derives the image tags from the release tag (vX.Y.Z): the exact
       # version, the moving X.Y, and latest. `latest` only moves on a
-      # real release event: a manual rebuild of an old tag must never
-      # repoint it backwards.
+      # real release event or when the dispatch explicitly asks for it
+      # (the automatic chain does): a plain rebuild of an old tag never
+      # repoints it backwards.
       - uses: docker/metadata-action@v6
         id: meta
         with:
@@ -98,7 +114,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' || inputs.latest == true }}
 
       - uses: docker/build-push-action@v7
         with:

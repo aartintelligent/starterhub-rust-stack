@@ -145,19 +145,23 @@ once checks pass (`ci-update` workflow); majors wait for a human.
 
 ## Release & deployment
 
-Versioning is automated, **publishing the image is a deliberate action**:
+The whole path from merge to published image is **automatic**:
 
 1. On every merge to `main`, release-please opens or updates a **release
    PR** accumulating changes and the computed version (all six crate
    versions and `Cargo.lock` bump in lockstep).
-2. Merging that release PR tags `vX.Y.Z`, publishes the GitHub release and
-   updates `CHANGELOG.md` — nothing is deployed.
-3. The `release` workflow then builds the hardened image and pushes it to
-   Docker Hub (`aartintelligent/starterhub-rust-stack`) with the `X.Y.Z`, `X.Y` and `latest`
-   tags. Releases created by the default `GITHUB_TOKEN` do not trigger it
-   automatically (GitHub loop protection): run it manually —
-   `gh workflow run release.yaml -f tag=vX.Y.Z` — or give release-please a
-   PAT to make the chain fully automatic.
+2. Merging that release PR tags `vX.Y.Z`, publishes the GitHub release
+   and updates `CHANGELOG.md`.
+3. The `release-please` workflow then chains the `release` workflow
+   (`workflow_dispatch` events are exempt from GitHub's loop protection,
+   so no PAT is involved), which builds the hardened image and pushes it
+   to Docker Hub (`aartintelligent/starterhub-rust-stack`) with the
+   `X.Y.Z`, `X.Y` and `latest` tags.
+
+To rebuild the image of a past release, dispatch the workflow by hand:
+`gh workflow run release.yaml -f tag=vX.Y.Z`. A manual rebuild never
+moves `latest` unless you add `-f latest=true` — the floating tag always
+follows the newest release.
 
 Do not bump versions or edit the changelog by hand — version state lives in
 `.release-please-manifest.json` and `release-please-config.json`. Crate
