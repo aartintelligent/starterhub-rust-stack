@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.6.0...v0.7.0) (2026-07-21)
+
+
+### Features
+
+* review follow-ups with tests and ci hardening ([#26](https://github.com/aartintelligent/starterhub-rust-stack/issues/26)) ([f17bfea](https://github.com/aartintelligent/starterhub-rust-stack/commit/f17bfeac2baee253816f71b2d36adc90235ff6f3))
+
 ## [0.6.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.5.0...v0.6.0) (2026-07-21)
 
 
