@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use anyhow::Context;
+use axum::Router;
 use axum::serve::Listener;
 use sea_orm::DatabaseConnection;
 use tokio::net::{TcpListener, TcpStream};
@@ -56,20 +57,20 @@ impl Server {
         }
     }
 
-    /// Binds the listener and serves requests until `shutdown` resolves.
+    /// Assembles the router and binds the listener, without serving yet.
     ///
-    /// Shutdown is graceful: axum stops accepting new connections, lets
-    /// in-flight requests complete, then returns.
+    /// Splitting bind from serve keeps startup failures (port taken,
+    /// invalid interface) distinct from the accept loop and exposes the
+    /// address actually bound: with port 0 the OS picks a free port and
+    /// [`BoundServer::local_addr`] is the ground truth operators and
+    /// tests rely on.
     ///
     /// # Errors
     ///
-    /// Fails if the address cannot be bound or if the server loop aborts;
-    /// every error carries enough context to be actionable from the logs.
-    pub async fn run(
-        self,
-        shutdown: impl Future<Output = ()> + Send + 'static,
-    ) -> anyhow::Result<()> {
-        // Assemble the full router here, not in the constructor: `run`
+    /// Fails if the address cannot be bound; the error names the culprit
+    /// address so the failure is actionable from the logs.
+    pub async fn bind(self) -> anyhow::Result<BoundServer> {
+        // Assemble the full router here, not in the constructor: `bind`
         // consumes `self`, so the state is built exactly once and no
         // half-initialized server can ever be observed. The middleware
         // stack wraps the finished router so it covers every route.
@@ -81,21 +82,80 @@ impl Server {
         // Bind before announcing anything: if the port is taken or the
         // interface is invalid, we fail fast with an error naming the
         // culprit address instead of logging a misleading "listening" line.
-        let listener = TcpListener::bind(&self.addr)
-            .await
-            .with_context(|| format!("failed to bind {}", self.addr))?;
+        let listener = NoDelayListener(
+            TcpListener::bind(&self.addr)
+                .await
+                .with_context(|| format!("failed to bind {}", self.addr))?,
+        );
 
-        // Log the address actually bound, not the configured one: with
-        // port 0 the OS picks a free port and this line is the ground
-        // truth operators and tests rely on.
+        // Resolve the bound address eagerly so it is available before the
+        // accept loop starts — the serve step only has to announce it.
         let local_addr = listener
             .local_addr()
             .context("failed to read the bound local address")?;
-        tracing::info!("listening on {local_addr}");
+
+        Ok(BoundServer {
+            app,
+            listener,
+            local_addr,
+        })
+    }
+
+    /// Binds the listener and serves requests until `shutdown` resolves.
+    ///
+    /// Convenience over [`bind`](Self::bind) then
+    /// [`serve`](BoundServer::serve) for callers that do not need the
+    /// bound address.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the address cannot be bound or if the server loop aborts;
+    /// every error carries enough context to be actionable from the logs.
+    pub async fn run(
+        self,
+        shutdown: impl Future<Output = ()> + Send + 'static,
+    ) -> anyhow::Result<()> {
+        self.bind().await?.serve(shutdown).await
+    }
+}
+
+/// A server whose listener is bound, ready to enter the accept loop.
+pub struct BoundServer {
+    /// Full application router wrapped in the middleware stack.
+    app: Router,
+    /// Tuned listener owning the bound socket.
+    listener: NoDelayListener,
+    /// Address actually bound, resolved at bind time.
+    local_addr: SocketAddr,
+}
+
+impl BoundServer {
+    /// Address actually bound — the ground truth when the configured
+    /// address used port 0 to let the OS pick a free one.
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+    }
+
+    /// Serves requests until `shutdown` resolves.
+    ///
+    /// Shutdown is graceful: axum stops accepting new connections, lets
+    /// in-flight requests complete, then returns.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the server loop aborts; the error carries enough context
+    /// to be actionable from the logs.
+    pub async fn serve(
+        self,
+        shutdown: impl Future<Output = ()> + Send + 'static,
+    ) -> anyhow::Result<()> {
+        // Log the address actually bound, not the configured one: this
+        // line is what operators and tests rely on.
+        tracing::info!("listening on {}", self.local_addr);
 
         // Enter the accept loop; the future resolves once `shutdown` fires
         // and every in-flight request has been given a chance to finish.
-        axum::serve(NoDelayListener(listener), app)
+        axum::serve(self.listener, self.app)
             .with_graceful_shutdown(shutdown)
             .await
             .context("http server aborted")?;
