@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/aartintelligent/rust-service-starter/compare/v0.4.0...v0.5.0) (2026-07-21)
+
+
+### Features
+
+* rename the starter to starterhub-rust-stack ([#19](https://github.com/aartintelligent/rust-service-starter/issues/19)) ([9663649](https://github.com/aartintelligent/rust-service-starter/commit/9663649f77a87927d7bc776f81c1679fda232115))
+
 ## [0.4.0](https://github.com/aartintelligent/ipam/compare/v0.3.0...v0.4.0) (2026-07-21)
 
 
