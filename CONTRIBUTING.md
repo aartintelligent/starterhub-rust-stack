@@ -40,6 +40,9 @@ fast inner-loop commands; `just ci` is the gate CI enforces on every pull
 request — **run it before every commit; a change that does not pass the
 gate is not finished.**
 
+The API answers on `http://127.0.0.1:8080` — probes on `/livez` and
+`/readyz`, interactive documentation on `/docs`.
+
 ## Code standards
 
 Enforced by the toolchain — CI and `just ci` fail otherwise:
