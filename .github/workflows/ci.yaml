@@ -93,7 +93,22 @@ jobs:
       # repositories. A failed upload fails the job: a silent failure
       # would freeze the reported coverage and hide regressions behind a
       # stale number.
+      #
+      # Two attempts: the action downloads its CLI and the Codecov GPG
+      # key on every run, and that download is occasionally flaky on
+      # GitHub-hosted runners. The upload is a required check, so one
+      # transient network failure must not block a PR — while two
+      # consecutive failures still fail the job, on purpose.
       - uses: codecov/codecov-action@v5
+        id: upload
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: true
+
+      - uses: codecov/codecov-action@v5
+        if: steps.upload.outcome == 'failure'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
