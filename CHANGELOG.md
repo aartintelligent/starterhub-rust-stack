@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/aartintelligent/ipam/compare/v0.2.0...v0.3.0) (2026-07-21)
+
+
+### Features
+
+* **common:** expose the application identity in the configuration ([#11](https://github.com/aartintelligent/ipam/issues/11)) ([cb779dd](https://github.com/aartintelligent/ipam/commit/cb779dda884effb277664c9333e3854f5ccccddd))
+
 ## [0.2.0](https://github.com/aartintelligent/ipam/compare/v0.1.0...v0.2.0) (2026-07-20)
 
 
