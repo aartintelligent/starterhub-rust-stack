@@ -60,3 +60,27 @@ fn on_error(error: BoxError) -> Ready<Response> {
 
     ready(response.into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The timeout branch (408) is covered end to end by the router
+    //! integration tests; only the defensive non-timeout branch needs a
+    //! direct call — nothing in the real stack can produce it.
+
+    use super::*;
+
+    /// Any error other than `Elapsed` is masked as an opaque `500`.
+    #[tokio::test]
+    async fn unexpected_error_masks_as_500() {
+        // Global TRACE-level test subscriber (first caller wins), so the
+        // masking log statement is fully evaluated.
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_test_writer()
+            .try_init();
+
+        let response = on_error(Box::new(std::io::Error::other("secret detail"))).await;
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

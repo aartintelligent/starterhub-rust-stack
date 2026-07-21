@@ -37,3 +37,32 @@ fn make_span(request: &Request<Body>) -> Span {
         request_id,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    //! The layer wiring is covered by the HTTP integration tests; what
+    //! needs a direct call is the span construction itself, under an
+    //! active subscriber so its fields are actually recorded.
+
+    use super::*;
+
+    /// The per-request span is enabled under an active subscriber and
+    /// carries the correlation id from the request headers.
+    #[test]
+    fn span_builds_under_an_active_subscriber() {
+        // Global TRACE-level test subscriber (first caller wins), so the
+        // span callsite is enabled and its fields evaluate.
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_test_writer()
+            .try_init();
+
+        let request = Request::builder()
+            .uri("/probe")
+            .header("x-request-id", "test-id")
+            .body(Body::empty())
+            .expect("valid request");
+
+        assert!(!make_span(&request).is_disabled());
+    }
+}

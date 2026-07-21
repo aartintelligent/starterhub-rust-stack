@@ -42,8 +42,14 @@ features = [
 workspace = true
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+# `io-util` and `sync` serve the real-server test: a raw TCP client and a
+# oneshot channel driving the graceful shutdown.
+tokio = { workspace = true, features = ["io-util", "macros", "rt-multi-thread", "sync", "time"] }
 tower = { workspace = true, features = ["util"] }
+
+# Test subscriber: log statements only fully evaluate under an active
+# subscriber, and the tests assert those paths execute without panicking.
+tracing-subscriber = { workspace = true }
 
 # `mock` provides the in-memory database the integration tests hand to
 # `AppState`, so the HTTP surface is testable without a live PostgreSQL.

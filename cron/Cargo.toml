@@ -20,3 +20,18 @@ sea-orm              = { workspace = true }
 thiserror            = { workspace = true }
 tokio-cron-scheduler = { workspace = true }
 tracing              = { workspace = true }
+
+[dev-dependencies]
+# `sync` and `time` serve the engine-tick test: a notification signalling
+# the execution and a bounded wait for it.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+# Test subscriber: log statements only fully evaluate under an active
+# subscriber, and the tests assert those paths execute without panicking.
+tracing-subscriber = { workspace = true }
+
+# `mock` provides the in-memory database handed to `AppState`, so the jobs
+# and the engine lifecycle are testable without a live PostgreSQL.
+[dev-dependencies.sea-orm]
+features  = ["mock"]
+workspace = true

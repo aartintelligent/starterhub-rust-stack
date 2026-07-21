@@ -134,6 +134,7 @@ dependencies = [
  "tower",
  "tower-http",
  "tracing",
+ "tracing-subscriber",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -674,6 +675,7 @@ dependencies = [
  "secrecy",
  "serde",
  "temp-env",
+ "tokio",
  "tracing-subscriber",
 ]
 
@@ -780,8 +782,10 @@ dependencies = [
  "async-trait",
  "sea-orm",
  "thiserror",
+ "tokio",
  "tokio-cron-scheduler",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
