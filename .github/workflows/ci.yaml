@@ -1,8 +1,11 @@
 # Continuous integration.
 #
-# One job that runs `just ci`, i.e. exactly the local quality gate
-# (fmt-check, clippy with -D warnings, tests): CI and the developer
-# machine can never disagree on what "green" means.
+# Two jobs:
+#   - gate: runs `just ci`, i.e. exactly the local quality gate
+#     (fmt-check, clippy with -D warnings, tests): CI and the developer
+#     machine can never disagree on what "green" means.
+#   - coverage: measures test coverage (cargo-llvm-cov) and uploads it to
+#     Codecov; thresholds and PR-comment behavior live in codecov.yml.
 name: ci
 
 on:
@@ -55,3 +58,41 @@ jobs:
 
       - name: Run the quality gate
         run: just ci
+
+  coverage:
+    name: coverage
+    # Organization self-hosted runners (group "default").
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same idempotent bootstrap as the gate; the llvm-tools component
+      # comes from rust-toolchain.toml like the rest of the toolchain.
+      - name: Install the pinned toolchain
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --default-toolchain none
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-llvm-cov
+
+      - name: Build the coverage report
+        run: just coverage-lcov
+
+      # The repository is private, so the upload authenticates with the
+      # CODECOV_TOKEN repository secret (from codecov.io, Settings >
+      # Secrets and variables > Actions). Upload failures never block a
+      # PR: the merge signal is the quality gate, coverage is telemetry.
+      - uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: false
