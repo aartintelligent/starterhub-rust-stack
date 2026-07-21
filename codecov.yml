@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Codecov — thresholds and PR-comment behavior for the upload performed by
+#  the `coverage` job in .github/workflows/ci.yaml. The repository is
+#  private, so the upload authenticates with the CODECOV_TOKEN secret.
+# ─────────────────────────────────────────────────────────────────────────────
+coverage:
+  status:
+    # Overall project coverage may drift down by at most 1% per PR.
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    # Patch coverage is reported but never blocks a PR — early-stage
+    # template, the signal matters more than the gate.
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, files"
+  behavior: default
+  require_changes: true

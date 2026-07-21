@@ -27,6 +27,9 @@ rule.
   the git hooks (recommended, see below).
 - [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) — optional,
   for the local dependency audit (`just deny`); CI runs it anyway.
+- [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) — optional,
+  for the local coverage report (`just coverage`); CI measures and
+  uploads coverage to Codecov on every pull request.
 
 ## Getting started
 

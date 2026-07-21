@@ -18,6 +18,7 @@ just lint                      # cargo clippy --workspace --all-targets -- -D wa
 just fmt / just fmt-check      # cargo fmt --all [--check]
 just test                      # cargo test --workspace
 just deny                      # cargo deny check (advisories, licenses, bans, sources)
+just coverage                  # cargo llvm-cov --workspace (terminal summary)
 just run                       # boot the app: config -> database -> migrations -> API + cron
 just db-up / db-down / db-reset  # local PostgreSQL via docker compose (db-reset wipes the volume)
 just migrate <cmd>             # sea-orm-migration CLI: up, down, status, ...

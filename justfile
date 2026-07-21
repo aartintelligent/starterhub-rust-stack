@@ -50,6 +50,16 @@ test:
 deny:
     cargo deny check
 
+# Coverage summary in the terminal.
+# Requires cargo-llvm-cov: `cargo install cargo-llvm-cov`.
+coverage:
+    cargo llvm-cov --workspace
+
+# Coverage in lcov format (lcov.info), consumed by the Codecov upload
+# in CI.
+coverage-lcov:
+    cargo llvm-cov --workspace --lcov --output-path lcov.info
+
 # Run the sea-orm-migration CLI, e.g. `just migrate up`, `just migrate status`.
 migrate *args:
     cargo run -p migration -- {{args}}
