@@ -229,6 +229,11 @@ impl Config {
             // types.
             .add_source(
                 config::Environment::with_prefix("APP")
+                    // Explicit on purpose: when only `separator` is set,
+                    // the crate defaults the prefix separator to it too,
+                    // and the whole documented `APP_*` convention would
+                    // silently require `APP__*`.
+                    .prefix_separator("_")
                     .separator("__")
                     .try_parsing(true),
             )
