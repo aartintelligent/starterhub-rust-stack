@@ -3,7 +3,7 @@
   "release-type": "rust",
   "packages": {
     ".": {
-      "package-name": "rust-service-starter",
+      "package-name": "starterhub-rust-stack",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false
     }

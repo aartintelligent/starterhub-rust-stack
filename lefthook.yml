@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-#  Lefthook — git hooks for rust-service-starter
+#  Lefthook — git hooks for starterhub-rust-stack
 #
 #  Hooks are tiered by cost so the developer feedback loop stays fast:
 #    • pre-commit  — seconds, runs every commit (formatting, linting, check)
