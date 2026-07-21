@@ -1,0 +1,53 @@
+# cargo-deny configuration: the dependency-tree gate.
+#
+# Four checks, run together by `just deny` and by the `audit` workflow:
+#   - advisories: RustSec vulnerabilities and yanked crates.
+#   - licenses:   every license in the tree must be allowed below.
+#   - bans:       duplicate versions and wildcard requirements.
+#   - sources:    crates may only come from crates.io.
+
+[graph]
+# Audit what could ever be compiled, not just the default feature set.
+all-features = true
+
+[advisories]
+# A yanked crate signals a problem its author considered serious enough
+# to pull the release; treat it like an advisory.
+yanked = "deny"
+
+[licenses]
+# Explicit allow-list: adding a dependency with a new license is a
+# deliberate, reviewed decision, not a silent drift. All entries are
+# permissive, MIT-compatible licenses.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "OpenSSL",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[bans]
+# Duplicate versions are inevitable in a deep tree: surface them without
+# failing the build.
+multiple-versions = "warn"
+# A `*` requirement delegates the choice of version to whoever publishes
+# next; forbid it — except for the workspace's own path dependencies,
+# which carry no version by design.
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# Everything comes from crates.io: a git or alternate-registry
+# dependency is a supply-chain decision that must be made explicitly
+# here, never implicitly in a Cargo.toml.
+unknown-registry = "deny"
+unknown-git = "deny"

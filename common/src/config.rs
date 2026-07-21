@@ -11,7 +11,10 @@
 //! 4. Environment variables prefixed with `APP_`, using `__` as the nesting
 //!    separator, e.g. `APP_DATABASE__POOL__MAX_CONNECTIONS=50`.
 
-use config::{Environment, File, FileFormat};
+// The `config` crate's `Environment` (the env-vars source) collides with
+// the local `Environment` enum below: keep the import list free of it and
+// use the fully-qualified path at the single point of use.
+use config::{File, FileFormat};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
@@ -27,6 +30,39 @@ const URL_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'~');
 
+/// Deployment environment of the running instance (`environment`,
+/// `APP_ENVIRONMENT`).
+///
+/// Drives environment-dependent behavior — e.g. the interactive API
+/// documentation is only exposed in [`Environment::Local`] and
+/// [`Environment::Development`]. Common short and uppercase spellings
+/// are accepted (`dev`, `DEV`, `prod`, `PROD`, ...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Environment {
+    /// Developer workstation.
+    #[serde(alias = "LOCAL")]
+    Local,
+    /// Shared development / integration deployment.
+    #[serde(alias = "dev", alias = "DEV", alias = "DEVELOPMENT")]
+    Development,
+    /// Pre-production deployment.
+    #[serde(alias = "STAGING")]
+    Staging,
+    /// Production deployment.
+    #[serde(alias = "prod", alias = "PROD", alias = "PRODUCTION")]
+    Production,
+}
+
+impl Environment {
+    /// True where the interactive API documentation (`/docs`) is exposed:
+    /// exploration belongs to local and development environments, never
+    /// to staging or production.
+    pub fn exposes_docs(self) -> bool {
+        matches!(self, Environment::Local | Environment::Development)
+    }
+}
+
 /// HTTP server settings (`server.*`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct Server {
@@ -34,6 +70,10 @@ pub struct Server {
     pub host: String,
     /// TCP port to listen on.
     pub port: u16,
+    /// Upper bound on the total processing time of one request, in
+    /// seconds: past it the client receives a JSON `408` instead of
+    /// holding a connection open indefinitely.
+    pub timeout: u64,
 }
 
 impl Server {
@@ -111,6 +151,9 @@ pub struct Config {
     /// Application version (`APP_VERSION`), defaulting to the crate
     /// version of the running binary — maintained by release-please.
     pub version: String,
+    /// Deployment environment (`APP_ENVIRONMENT`), driving
+    /// environment-dependent behavior such as exposing `/docs`.
+    pub environment: Environment,
     /// Enables verbose telemetry (`APP_DEBUG=true` -> DEBUG level,
     /// otherwise INFO).
     pub debug: bool,
@@ -150,9 +193,14 @@ impl Config {
             // fails on a missing field.
             .set_default("name", name)?
             .set_default("version", version)?
+            // `local` is the safe zero-setup default; the production
+            // image overrides it (`APP_ENVIRONMENT=production` in the
+            // Dockerfile).
+            .set_default("environment", "local")?
             .set_default("debug", false)?
             .set_default("server.host", "127.0.0.1")?
             .set_default("server.port", 8080)?
+            .set_default("server.timeout", 30)?
             .set_default("database.host", "localhost")?
             .set_default("database.port", 5432)?
             .set_default("database.username", "root")?
@@ -180,7 +228,12 @@ impl Config {
             // `try_parsing` coerces strings into the target numeric/bool
             // types.
             .add_source(
-                Environment::with_prefix("APP")
+                config::Environment::with_prefix("APP")
+                    // Explicit on purpose: when only `separator` is set,
+                    // the crate defaults the prefix separator to it too,
+                    // and the whole documented `APP_*` convention would
+                    // silently require `APP__*`.
+                    .prefix_separator("_")
                     .separator("__")
                     .try_parsing(true),
             )

@@ -8,6 +8,7 @@
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use anyhow::Context;
 use axum::serve::Listener;
@@ -24,14 +25,30 @@ pub struct Server {
     addr: String,
     /// Database handle shared with every handler through [`AppState`].
     conn: DatabaseConnection,
+    /// Whether the interactive documentation (`/docs`) is mounted; the
+    /// binary decides from the deployment environment.
+    docs: bool,
+    /// Upper bound on the total processing time of one request.
+    timeout: Duration,
 }
 
 impl Server {
     /// Creates a server bound to `addr` once [`run`](Self::run) is called.
-    pub fn new(addr: impl Into<String>, conn: DatabaseConnection) -> Self {
+    ///
+    /// The server stays configuration-agnostic on purpose: it receives
+    /// plain values (`docs`, `timeout`), and the binary crate maps the
+    /// configuration onto them.
+    pub fn new(
+        addr: impl Into<String>,
+        conn: DatabaseConnection,
+        docs: bool,
+        timeout: Duration,
+    ) -> Self {
         Self {
             addr: addr.into(),
             conn,
+            docs,
+            timeout,
         }
     }
 
@@ -52,7 +69,10 @@ impl Server {
         // consumes `self`, so the state is built exactly once and no
         // half-initialized server can ever be observed. The middleware
         // stack wraps the finished router so it covers every route.
-        let app = middleware::apply(router::router(AppState::new(self.conn)));
+        let app = middleware::apply(
+            router::router(AppState::new(self.conn), self.docs),
+            self.timeout,
+        );
 
         // Bind before announcing anything: if the port is taken or the
         // interface is invalid, we fail fast with an error naming the

@@ -8,6 +8,8 @@
 //! Debian service receives from systemd) **and** when any component stops
 //! on its own, so the process can never linger half-alive.
 
+use std::time::Duration;
+
 use anyhow::Context;
 use api::server::Server as ApiServer;
 use common::{config::Config, infrastructure::postgresql, telemetry};
@@ -41,9 +43,15 @@ async fn main() -> anyhow::Result<()> {
     // first event.
     telemetry::init(config.debug);
 
-    // First trace of every boot: which build is running. Invaluable in
-    // production logs when correlating an incident with a deployment.
-    tracing::info!(name = %config.name, version = %config.version, "booting");
+    // First trace of every boot: which build is running, and where.
+    // Invaluable in production logs when correlating an incident with a
+    // deployment.
+    tracing::info!(
+        name = %config.name,
+        version = %config.version,
+        environment = ?config.environment,
+        "booting"
+    );
 
     // Open the PostgreSQL pool eagerly: failing fast at boot beats
     // discovering a broken database on the first incoming request. `?`
@@ -83,8 +91,17 @@ async fn main() -> anyhow::Result<()> {
     // Spawn each long-lived component with its own view of the token;
     // `canceled_owned` yields a plain `Future<Output = ()>`, so the
     // components stay signal-agnostic and testable with any future.
+    // The API receives plain values, not the configuration itself: the
+    // environment collapses into "expose the docs or not", and the
+    // timeout into a Duration.
     let api_handle = tokio::spawn(
-        ApiServer::new(config.server.url(), conn).run(shutdown.clone().cancelled_owned()),
+        ApiServer::new(
+            config.server.url(),
+            conn,
+            config.environment.exposes_docs(),
+            Duration::from_secs(config.server.timeout),
+        )
+        .run(shutdown.clone().cancelled_owned()),
     );
     let cron_handle = tokio::spawn(cron.run(shutdown.clone().cancelled_owned()));
 

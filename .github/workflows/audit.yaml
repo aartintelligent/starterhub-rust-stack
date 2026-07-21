@@ -1,0 +1,48 @@
+# Dependency audit.
+#
+# cargo-deny checks the dependency tree on four axes (configuration in
+# deny.toml): RustSec advisories, license compliance, duplicate/wildcard
+# bans and trusted sources. It runs when the dependency set changes and
+# every week — new advisories are published against unchanged lockfile,
+# so a scheduled run is the only way to hear about them.
+#
+# Kept out of the `ci` quality gate on purpose: an advisory published
+# overnight must page the maintainers, not fail an unrelated PR.
+name: audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/audit.yaml"
+  pull_request:
+    paths:
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/audit.yaml"
+  schedule:
+    # Monday 06:00 UTC, aligned with the Dependabot schedule so advisory
+    # findings and the update PRs land in the same review pass.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# Read-only token: the audit only reads the tree and the advisory DB.
+permissions:
+  contents: read
+
+jobs:
+  deny:
+    name: cargo deny
+    # Organization self-hosted runners (group "default").
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ships a prebuilt cargo-deny binary: no Rust toolchain needed.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check

@@ -15,7 +15,10 @@
 
 mod catch_panic;
 mod request_id;
+mod timeout;
 mod trace;
+
+use std::time::Duration;
 
 use axum::Router;
 use tower::ServiceBuilder;
@@ -26,14 +29,18 @@ use tower::ServiceBuilder;
 /// 1. [`request_id::set`] first, so every later layer sees the id;
 /// 2. [`trace::layer`] next, opening a span already carrying that id;
 /// 3. [`request_id::propagate`] then mirrors the id onto the response;
-/// 4. [`catch_panic::layer`] innermost, so a panicking handler still
+/// 4. [`timeout::handle`] + [`timeout::layer`] bound the time spent in
+///    everything below, answering a JSON `408` past `timeout`;
+/// 5. [`catch_panic::layer`] innermost, so a panicking handler still
 ///    produces a traced, correlated `500` instead of a dropped connection.
-pub fn apply(router: Router) -> Router {
+pub fn apply(router: Router, timeout: Duration) -> Router {
     router.layer(
         ServiceBuilder::new()
             .layer(request_id::set())
             .layer(trace::layer())
             .layer(request_id::propagate())
+            .layer(timeout::handle())
+            .layer(timeout::layer(timeout))
             .layer(catch_panic::layer()),
     )
 }

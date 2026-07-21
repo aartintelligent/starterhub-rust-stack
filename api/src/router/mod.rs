@@ -50,15 +50,10 @@ struct ApiDoc;
 ///
 /// Health endpoints follow the Kubernetes probe conventions: `/livez` and
 /// its legacy alias `/healthz` for liveness, `/readyz` for readiness.
-/// Swagger UI is served on `/docs`, backed by the generated document at
-/// `/api-docs/openapi.json`.
-pub fn router(state: AppState) -> Router {
-    Router::new()
-        // Interactive documentation. The UI itself is static HTML/JS —
-        // the JSON-only rule targets API responses, and the underlying
-        // contract (`/api-docs/openapi.json`) is JSON like everything
-        // else.
-        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+/// When `docs` is true, Swagger UI is served on `/docs`, backed by the
+/// generated document at `/api-docs/openapi.json`.
+pub fn router(state: AppState, docs: bool) -> Router {
+    let router = Router::new()
         // Probes stay at the root, outside any versioned prefix: their
         // paths are contractual for the orchestrator and must survive API
         // evolutions. `/healthz` is kept as the legacy alias of `/livez`.
@@ -67,10 +62,22 @@ pub fn router(state: AppState) -> Router {
         .route("/readyz", get(readyz))
         // Unknown paths answer with the JSON error envelope instead of
         // axum's default empty 404.
-        .fallback(not_found)
-        // Attach the state last so every route above receives it; axum
-        // enforces at compile time that nothing is left unresolved.
-        .with_state(state)
+        .fallback(not_found);
+
+    // Interactive documentation, mounted only where exploration is
+    // expected (the binary decides from the `environment` configuration:
+    // local and development). The UI itself is static HTML/JS — the
+    // JSON-only rule targets API responses, and the underlying contract
+    // (`/api-docs/openapi.json`) is JSON like everything else.
+    let router = if docs {
+        router.merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+    } else {
+        router
+    };
+
+    // Attach the state last so every route above receives it; axum
+    // enforces at compile time that nothing is left unresolved.
+    router.with_state(state)
 }
 
 /// Liveness probe: reports that the process is up and able to answer.
