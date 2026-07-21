@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.5.0...v0.6.0) (2026-07-21)
+
+
+### Features
+
+* request timeout, env-gated docs and dependency audit ([#25](https://github.com/aartintelligent/starterhub-rust-stack/issues/25)) ([c5d1cec](https://github.com/aartintelligent/starterhub-rust-stack/commit/c5d1cecfc5354542ce52eb51a1ccb9e6072ae20c))
+
+
+### Bug Fixes
+
+* **common:** safe pool defaults and url encoding ([#23](https://github.com/aartintelligent/starterhub-rust-stack/issues/23)) ([2bda066](https://github.com/aartintelligent/starterhub-rust-stack/commit/2bda066b6757247e384e75508bc720f4d432e28b))
+
 ## [0.5.0](https://github.com/aartintelligent/rust-service-starter/compare/v0.4.0...v0.5.0) (2026-07-21)
 
 

@@ -53,7 +53,7 @@ license.workspace      = true
 name                   = "starterhub-rust-stack"
 publish.workspace      = true
 rust-version.workspace = true
-version                = "0.5.0"
+version                = "0.6.0"
 
 [lints]
 workspace = true
