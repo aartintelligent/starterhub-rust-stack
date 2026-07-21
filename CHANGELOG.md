@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/aartintelligent/ipam/compare/v0.3.0...v0.4.0) (2026-07-21)
+
+
+### Features
+
+* rebrand the workspace as rust-service-starter ([#17](https://github.com/aartintelligent/ipam/issues/17)) ([dc0adee](https://github.com/aartintelligent/ipam/commit/dc0adee7fc50fd0a3e78c2f58fbe3d2648f6173a))
+
 ## [0.3.0](https://github.com/aartintelligent/ipam/compare/v0.2.0...v0.3.0) (2026-07-21)
 
 
