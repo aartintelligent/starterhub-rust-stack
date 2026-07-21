@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## The contract
 
-`CONTRIBUTING.md` is the **authoritative ruleset** for this repository: crate/module layout tables ("where code goes"), hard API rules, migration rules, and the Conventional Commits v1.0.0 format (parsed by release-please — a malformed commit message corrupts the release pipeline). Read it before writing code. This file only adds commands and the cross-file architecture picture.
+The documentation set has three roles: `CONTRIBUTING.md` is the **binding process** (where code goes, hard API rules, branching, Conventional Commits v1.0.0 — parsed by release-please, a malformed commit message corrupts the release pipeline — hooks, release flow); `ARCHITECTURE.md` is the **guided design tour** (boot/shutdown, request anatomy, extension recipes); `README.md` is the front door and only routes to the other two. Read CONTRIBUTING.md before writing code. This file only adds commands and the condensed cross-file picture.
 
 Branching: `main` is the only long-lived branch, never pushed directly. Work happens on `<type>/<short-topic>` branches merged back by squash through a PR whose title is a Conventional Commit.
 
