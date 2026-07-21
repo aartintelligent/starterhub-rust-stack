@@ -11,7 +11,7 @@ services:
     # target of the project); major 17 is a stable, long-supported line
     # (PostgreSQL majors receive 5 years of fixes).
     image: postgres:18-trixie
-    container_name: rust-service-starter-postgres
+    container_name: starterhub-rust-stack-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: root

@@ -1,4 +1,4 @@
-# rust-service-starter
+# starterhub-rust-stack
 
 The foundation for Rust service stacks: a production-grade starter you
 instantiate to begin every new service — not a demo, a **runnable,

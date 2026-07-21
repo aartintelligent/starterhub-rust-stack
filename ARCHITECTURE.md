@@ -25,7 +25,7 @@ promoted to errors by the quality gate.
 
 | Crate        | Role                                                                 |
 | ------------ | -------------------------------------------------------------------- |
-| `.` (`rust-service-starter`) | Binary entry point: boot sequence only, no business logic.           |
+| `.` (`starterhub-rust-stack`) | Binary entry point: boot sequence only, no business logic.           |
 | `api`        | HTTP layer: routing, handlers, DTOs, errors, OpenAPI, server.        |
 | `common`     | Shared building blocks: configuration, telemetry, infrastructure.    |
 | `entity`     | Database entities (sea-orm models) — the single home for data models. |
@@ -105,7 +105,7 @@ Key properties, each enforced by one place in the code:
 Typed structs in `common/src/config.rs`, merged in ascending priority:
 
 1. Hard-coded defaults — the service boots with zero external setup.
-2. Optional `/etc/rust-service-starter/app-config.json` (FHS path for the Debian/container
+2. Optional `/etc/starterhub-rust-stack/app-config.json` (FHS path for the Debian/container
    deployment target).
 3. Optional `app-config.json` in the working directory (local override,
    never committed).
@@ -163,7 +163,7 @@ design:
   organization's self-hosted runners; release-please maintains the release
   PR from the Conventional Commits history; merging it tags the release,
   and the `release` workflow builds and pushes the image to Docker Hub
-  (`aartintelligent/rust-service-starter`) with semver tags. Builds are cached two ways:
+  (`aartintelligent/starterhub-rust-stack`) with semver tags. Builds are cached two ways:
   a persistent BuildKit builder per runner (keeps cargo's `RUN` cache
   mounts) and a shared `:buildcache` registry cache (layers reused across
   machines) — a no-change rebuild takes ~35 s instead of ~3 min.

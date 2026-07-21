@@ -35,7 +35,7 @@ use crate::state::AppState;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "rust-service-starter",
+        title = "starterhub-rust-stack",
         description = "A fast web service, built in Rust.",
         license(name = "MIT", identifier = "MIT")
     ),

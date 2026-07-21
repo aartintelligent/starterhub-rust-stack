@@ -3,7 +3,7 @@
 //! Sources are merged in ascending priority:
 //!
 //! 1. Hard-coded defaults (the application boots with zero external setup).
-//! 2. An optional system file `/etc/rust-service-starter/app-config.json` — the FHS
+//! 2. An optional system file `/etc/starterhub-rust-stack/app-config.json` — the FHS
 //!    location for a Debian 13 deployment, mounted or baked into the
 //!    Docker image.
 //! 3. An optional `app-config.json` in the working directory, the local
@@ -151,7 +151,7 @@ impl Config {
             // Layer 2 — optional system file, at the FHS-compliant path
             // for the Debian 13 / Docker deployment target: `/etc/<app>/`
             // is where a packaged service reads its configuration.
-            .add_source(File::new("/etc/rust-service-starter/app-config", FileFormat::Json).required(false))
+            .add_source(File::new("/etc/starterhub-rust-stack/app-config", FileFormat::Json).required(false))
             // Layer 3 — optional `app-config.json` in the working
             // directory: the local development override, JSON only by
             // design and never committed; it wins over the system file.
