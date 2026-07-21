@@ -89,10 +89,11 @@ jobs:
 
       # The repository is private, so the upload authenticates with the
       # CODECOV_TOKEN repository secret (from codecov.io, Settings >
-      # Secrets and variables > Actions). Upload failures never block a
-      # PR: the merge signal is the quality gate, coverage is telemetry.
+      # Secrets and variables > Actions). A failed upload fails the job:
+      # a silent failure would freeze the reported coverage and hide
+      # regressions behind a stale number.
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
-          fail_ci_if_error: false
+          fail_ci_if_error: true
