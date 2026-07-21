@@ -24,7 +24,8 @@ use tokio_util::sync::CancellationToken;
 /// Boots the application.
 ///
 /// Steps, in order:
-/// 1. Load the layered configuration (defaults, then `config.json`, then `APP_*` env).
+/// 1. Load the layered configuration (defaults, then the optional
+///    `app-config.json` files, then `APP_*` env).
 /// 2. Install the global tracing subscriber, verbosity driven by `APP_DEBUG`.
 /// 3. Open the PostgreSQL connection pool.
 /// 4. Apply pending migrations so the schema is always up to date.
@@ -92,12 +93,13 @@ async fn main() -> anyhow::Result<()> {
     // `canceled_owned` yields a plain `Future<Output = ()>`, so the
     // components stay signal-agnostic and testable with any future.
     // The API receives plain values, not the configuration itself: the
-    // environment collapses into "expose the docs or not", and the
-    // timeout into a Duration.
+    // environment collapses into "expose the docs or not", the timeout
+    // into a Duration, and the identity into the OpenAPI title.
     let api_handle = tokio::spawn(
         ApiServer::new(
             config.server.url(),
             conn,
+            config.name.clone(),
             config.environment.exposes_docs(),
             Duration::from_secs(config.server.timeout),
         )

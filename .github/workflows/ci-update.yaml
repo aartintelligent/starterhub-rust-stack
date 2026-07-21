@@ -19,9 +19,10 @@ permissions:
 
 jobs:
   auto-merge:
-    # Guard on the actor, not the branch name: only PRs actually opened
-    # by Dependabot are trusted here.
-    if: github.actor == 'dependabot[bot]'
+    # Guard on the actor AND the PR author, never the branch name: the
+    # actor alone can differ on re-triggered events, and either check
+    # failing means the PR is not trusted here.
+    if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'
     # Organization self-hosted runners (group "default"); the runner
     # must provide the `gh` CLI.
     runs-on: self-hosted

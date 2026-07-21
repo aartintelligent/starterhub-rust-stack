@@ -29,3 +29,9 @@ features = [
     "sqlx-postgres",
 ]
 workspace = true
+
+[dev-dependencies]
+# Serialized, restoring env-var manipulation: process environment is
+# global state, and `std::env::set_var` is unsafe in edition 2024 —
+# forbidden workspace-wide.
+temp-env = { workspace = true }

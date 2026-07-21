@@ -74,8 +74,9 @@ Rules:
   (ServiceBuilder order = execution order).
 - **Health probes** (`/livez`, `/readyz`, `/healthz`) follow Kubernetes
   conventions and are defined in `router/`, not `handler/`.
-- **Every request is time-bounded**: past `server.timeout` (default 30 s)
-  the client receives a JSON `408` instead of holding a connection open.
+- **Every request is bounded**: past `server.timeout` (default 30 s) the
+  client receives a JSON `408`, and request bodies are capped at 2 MiB
+  (JSON `413`).
 - **Every endpoint is part of the OpenAPI contract**: annotate the handler
   with `#[utoipa::path]` and register it in `ApiDoc` (`router/mod.rs`).
   Swagger UI on `/docs`, document on `/api-docs/openapi.json` — both

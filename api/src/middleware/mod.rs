@@ -13,6 +13,7 @@
 //!   naturally (unlike chained `Router::layer` calls, which execute bottom
 //!   to top).
 
+mod body_limit;
 mod catch_panic;
 mod request_id;
 mod timeout;
@@ -29,9 +30,11 @@ use tower::ServiceBuilder;
 /// 1. [`request_id::set`] first, so every later layer sees the id;
 /// 2. [`trace::layer`] next, opening a span already carrying that id;
 /// 3. [`request_id::propagate`] then mirrors the id onto the response;
-/// 4. [`timeout::handle`] + [`timeout::layer`] bound the time spent in
+/// 4. [`body_limit::layer`] declares the request size cap consumed by
+///    the extractors;
+/// 5. [`timeout::handle`] + [`timeout::layer`] bound the time spent in
 ///    everything below, answering a JSON `408` past `timeout`;
-/// 5. [`catch_panic::layer`] innermost, so a panicking handler still
+/// 6. [`catch_panic::layer`] innermost, so a panicking handler still
 ///    produces a traced, correlated `500` instead of a dropped connection.
 pub fn apply(router: Router, timeout: Duration) -> Router {
     router.layer(
@@ -39,6 +42,7 @@ pub fn apply(router: Router, timeout: Duration) -> Router {
             .layer(request_id::set())
             .layer(trace::layer())
             .layer(request_id::propagate())
+            .layer(body_limit::layer())
             .layer(timeout::handle())
             .layer(timeout::layer(timeout))
             .layer(catch_panic::layer()),
