@@ -1,0 +1,21 @@
+# Rules for `committed` (crate-ci/committed), invoked by the commit-msg
+# hook (see lefthook.yml). Mirrors the Conventional Commits contract of
+# CONTRIBUTING.md — same type list as release-please expects.
+
+style = "conventional"
+
+# Same types as CONTRIBUTING.md and the pr workflow.
+allowed_types = [
+    "feat",
+    "fix",
+    "docs",
+    "refactor",
+    "perf",
+    "test",
+    "build",
+    "ci",
+    "chore",
+]
+
+# House style: description in lower case ("feat: add ...", not "feat: Add ...").
+subject_capitalized = false

@@ -24,6 +24,9 @@ flamegraph.svg
 # Claude Code local overrides (the rest of .claude/ is versioned)
 .claude/settings.local.json
 
+# Lefthook machine-local overrides (lefthook.yml is versioned)
+lefthook-local.yml
+
 # VS Code
 .vscode/
 *.code-workspace
