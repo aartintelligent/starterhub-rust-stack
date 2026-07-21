@@ -52,7 +52,7 @@ shutdown argument and stay signal-agnostic.
 ```text
 TCP
   └─ middleware::apply — one ServiceBuilder, top-to-bottom:
-       set x-request-id  →  trace span  →  propagate x-request-id  →  timeout  →  catch panics
+       set x-request-id  →  trace span  →  propagate x-request-id  →  body cap  →  timeout  →  catch panics
          └─ router: /livez /healthz /readyz + fallback (+ /docs, /api-docs/openapi.json in local/dev)
               └─ handler (crate::extract::{Json, Path})
                    └─ service (Query / Mutation)  →  sea-orm  →  PostgreSQL

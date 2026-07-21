@@ -24,8 +24,10 @@ impl Job for Hello {
 
     async fn run(&self, _state: &AppState) -> JobResult {
         // A single trace line is the whole job: enough to see the cron
-        // engine ticking in the logs.
-        tracing::info!("hello from the cron engine");
+        // engine ticking. DEBUG, not INFO: a per-minute heartbeat would
+        // add 1440 noise lines a day to production logs; opt in with
+        // APP_DEBUG=true (or RUST_LOG) when observing the engine.
+        tracing::debug!("hello from the cron engine");
 
         Ok(())
     }
