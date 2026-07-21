@@ -49,7 +49,7 @@ utoipa-swagger-ui  = "9"
 [package]
 edition.workspace      = true
 license.workspace      = true
-name                   = "ipam"
+name                   = "rust-service-starter"
 publish.workspace      = true
 rust-version.workspace = true
 version                = "0.3.0"

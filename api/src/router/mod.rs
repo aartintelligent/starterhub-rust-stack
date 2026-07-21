@@ -35,8 +35,8 @@ use crate::state::AppState;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "IPAM",
-        description = "A fast IPAM API, built in Rust.",
+        title = "rust-service-starter",
+        description = "A fast web service, built in Rust.",
         license(name = "MIT", identifier = "MIT")
     ),
     paths(livez, readyz),

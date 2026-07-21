@@ -1556,20 +1556,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipam"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "api",
- "common",
- "cron",
- "migration",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2289,6 +2275,20 @@ checksum = "42ffa149f6aa81b58a5b3011d01a857c4ed12c7a732d2c51947a4c7c692185f0"
 dependencies = [
  "sha2 0.11.0",
  "walkdir",
+]
+
+[[package]]
+name = "rust-service-starter"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "api",
+ "common",
+ "cron",
+ "migration",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

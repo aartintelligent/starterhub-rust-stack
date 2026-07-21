@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to ipam. This guide is the **binding process** for
+Thanks for contributing to rust-service-starter. This guide is the **binding process** for
 the repository — how to work in it, the commit and branching rules, and how
 changes reach a release. It applies to human contributors **and to AI
 coding agents**: if a change you are asked to make conflicts with this
@@ -45,7 +45,7 @@ metadata, dependencies and lints from the root `Cargo.toml`.
 
 | Crate        | Role                                                                 |
 | ------------ | -------------------------------------------------------------------- |
-| `.` (`ipam`) | Binary entry point: boot sequence only, no business logic.           |
+| `.` (`rust-service-starter`) | Binary entry point: boot sequence only, no business logic.           |
 | `api`        | HTTP layer: routing, handlers, DTOs, errors, OpenAPI, server.        |
 | `common`     | Shared building blocks: configuration, telemetry, infrastructure.    |
 | `entity`     | Database entities (sea-orm models) — the single home for data models. |
@@ -88,7 +88,7 @@ metadata, dependencies and lints from the root `Cargo.toml`.
   `Router::layer` calls.
 - **Configuration** is modelled in `common/src/config.rs` as typed structs;
   every key has a default, overridden by the optional
-  `/etc/ipam/app-config.json`, an optional local `app-config.json` (never
+  `/etc/rust-service-starter/app-config.json`, an optional local `app-config.json` (never
   committed), then `APP_*` environment variables (`__` separator). Secrets
   are `secrecy::SecretString`, read with `expose_secret()` only at the
   single point of final consumption. Document every variable in
@@ -214,7 +214,7 @@ Versioning is automated, **publishing the image is a deliberate action**:
 2. Merging that release PR tags `vX.Y.Z`, publishes the GitHub release and
    updates `CHANGELOG.md` — nothing is deployed.
 3. The `release` workflow then builds the hardened image and pushes it to
-   Docker Hub (`aartintelligent/ipam`) with the `X.Y.Z`, `X.Y` and `latest`
+   Docker Hub (`aartintelligent/rust-service-starter`) with the `X.Y.Z`, `X.Y` and `latest`
    tags. Releases created by the default `GITHUB_TOKEN` do not trigger it
    automatically (GitHub loop protection): run it manually —
    `gh workflow run release.yaml -f tag=vX.Y.Z` — or give release-please a
