@@ -1,14 +1,16 @@
 # Contributing
 
 Thanks for contributing to starterhub-rust-stack. This guide is the **binding process** for
-the repository — how to work in it, the commit and branching rules, and how
-changes reach a release. It applies to human contributors **and to AI
-coding agents**: if a change you are asked to make conflicts with this
-document, surface the conflict instead of silently breaking the rule.
+the repository — how to set it up, work in it, the commit and branching
+rules, and how changes reach a release. It applies to human contributors
+**and to AI coding agents**: if a change you are asked to make conflicts
+with this document, surface the conflict instead of silently breaking the
+rule.
 
-> Design notes and the guided tour of the codebase live in
-> [`ARCHITECTURE.md`](./ARCHITECTURE.md) — read it before writing code.
-> Condensed agent guidance lives in [`CLAUDE.md`](./CLAUDE.md).
+> Everything about the codebase itself — the workspace layout, where code
+> goes, the design rules a change must respect, and the extension recipes —
+> lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md). Read it before writing
+> code. Condensed agent guidance lives in [`CLAUDE.md`](./CLAUDE.md).
 
 ## Prerequisites
 
@@ -38,71 +40,6 @@ fast inner-loop commands; `just ci` is the gate CI enforces on every pull
 request — **run it before every commit; a change that does not pass the
 gate is not finished.**
 
-## Where code goes
-
-The project is a Cargo workspace (resolver 3). Every crate inherits its
-metadata, dependencies and lints from the root `Cargo.toml`.
-
-| Crate        | Role                                                                 |
-| ------------ | -------------------------------------------------------------------- |
-| `.` (`starterhub-rust-stack`) | Binary entry point: boot sequence only, no business logic.           |
-| `api`        | HTTP layer: routing, handlers, DTOs, errors, OpenAPI, server.        |
-| `common`     | Shared building blocks: configuration, telemetry, infrastructure.    |
-| `entity`     | Database entities (sea-orm models) — the single home for data models. |
-| `cron`       | Cron jobs (tokio-cron-scheduler): one job per file, hard-coded schedules. |
-| `migration`  | Schema migrations and their standalone CLI.                          |
-
-### The `api` crate
-
-| Module        | Responsibility                                                       |
-| ------------- | -------------------------------------------------------------------- |
-| `dto/`        | Wire format: request payloads and response bodies.                   |
-| `error.rs`    | The single `ApiError` type; every handler returns `ApiResult<T>`.    |
-| `extract.rs`  | Crate-local extractors (`Json`, `Path`) rejecting through `ApiError`. |
-| `handler/`    | Business handlers only: extract input, call a service, map the result. |
-| `middleware/` | Cross-cutting layers: one module per concern, composed in `middleware::apply` via `tower::ServiceBuilder`. |
-| `router/`     | The only place where URLs are declared; also hosts the technical endpoints (health probes, 404 fallback) and the OpenAPI document (`ApiDoc` + Swagger UI). |
-| `server.rs`   | HTTP server bootstrap (`Server::new(addr, conn).run()`).             |
-| `service/`    | Business logic, split between `Query` (reads) and `Mutation` (writes). |
-| `state.rs`    | `AppState`, the dependencies shared with every handler.              |
-
-### Hard rules
-
-- Handlers never touch the database directly: they go through `service/`.
-- New failure modes become variants of `ApiError` (one match arm each),
-  never ad-hoc status codes.
-- The API speaks **JSON only**: every response body, success or failure,
-  health probes included. Failures use the single `{ "error": ... }`
-  envelope. Handlers take their inputs through `crate::extract::{Json,
-  Path}`, never the stock axum extractors.
-- Every endpoint is part of the OpenAPI contract: annotate the handler with
-  `#[utoipa::path]` and register it in `ApiDoc`'s `paths(...)`
-  (`router/mod.rs`). Swagger UI is on `/docs`, the document on
-  `/api-docs/openapi.json`; an endpoint missing from `ApiDoc` counts as
-  undocumented.
-- Health endpoints (`/livez`, `/readyz`, `/healthz`) follow the Kubernetes
-  probe conventions, stay at the root outside any versioned prefix, and are
-  defined in `router/`, not `handler/`.
-- Middlewares do one thing each and are registered in `middleware::apply`
-  (ServiceBuilder, top-to-bottom execution) — never scattered
-  `Router::layer` calls.
-- **Configuration** is modelled in `common/src/config.rs` as typed structs;
-  every key has a default, overridden by the optional
-  `/etc/starterhub-rust-stack/app-config.json`, an optional local `app-config.json` (never
-  committed), then `APP_*` environment variables (`__` separator). Secrets
-  are `secrecy::SecretString`, read with `expose_secret()` only at the
-  single point of final consumption. Document every variable in
-  `.env.example`.
-- **Database entities** go to the `entity` crate, re-exported in
-  `entity/src/prelude.rs`; the `api` crate defines no entity of its own.
-- **Migrations**: one module `mYYYYMMDD_NNNNNN_<label>` in
-  `migration/src/source/`, registered chronologically in
-  `Migrator::migrations`. Never edit, reorder or delete a shipped
-  migration: append a new one.
-- **Cron jobs**: a unit struct implementing the `Job` trait in
-  `cron/src/job/`, added to `job::roster()`. Schedules are hard-coded —
-  they are behavior, reviewed in code, not runtime configuration.
-
 ## Code standards
 
 Enforced by the toolchain — CI and `just ci` fail otherwise:
@@ -115,9 +52,6 @@ Enforced by the toolchain — CI and `just ci` fail otherwise:
 - **Formatting and lints are non-negotiable.** `cargo fmt`
   (`rustfmt.toml`) and `cargo clippy --workspace --all-targets` with zero
   warnings (`clippy.toml`, MSRV 1.97).
-- **Dependencies** are declared once in `[workspace.dependencies]` and
-  inherited with `workspace = true`; features are added at the crate that
-  needs them. Stable versions only — no release candidates.
 
 ## Branching model
 
@@ -240,11 +174,11 @@ rewrite literal strings.
 ## Notes for AI agents
 
 - This file is the contract for **process**; `ARCHITECTURE.md` is the
-  reference for **design**. Read both before writing code; keep every gate
-  green and report failures honestly.
-- Never introduce `unsafe`, undocumented items, or a dependency pinned
-  outside `[workspace.dependencies]`.
-- Never modify a shipped migration; always append a new one.
+  reference for **the codebase** — layout, design rules, extension
+  recipes. Read both before writing code; keep every gate green and report
+  failures honestly.
+- Never introduce `unsafe` or undocumented items; follow the layout and
+  design rules of `ARCHITECTURE.md`.
 - Write commit messages and PR titles in Conventional Commits form so the
   release automation keeps working.
 - Respect the git hooks; do not commit with `--no-verify`.

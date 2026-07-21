@@ -1,9 +1,11 @@
 # Architecture
 
 A guided tour of the service, meant to be read top-to-bottom the first
-time you open the codebase. It explains **how the pieces fit and why they
-are shaped this way**; the binding rules (where a file goes, commit format,
-release process) live in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+time you open the codebase. It explains **how the pieces fit, where code
+goes and why it is shaped this way** — the layout and design rules stated
+here are binding, not suggestions. The contribution process (toolchain
+setup, branching, commit format, hooks, release pipeline) lives in
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 - [The workspace at a glance](#the-workspace-at-a-glance)
 - [Boot and shutdown](#boot-and-shutdown)
@@ -31,6 +33,24 @@ promoted to errors by the quality gate.
 | `entity`     | Database entities (sea-orm models) — the single home for data models. |
 | `cron`       | Cron engine and jobs (tokio-cron-scheduler), one job per file.       |
 | `migration`  | Schema migrations and their standalone CLI.                          |
+
+Dependencies are declared once in `[workspace.dependencies]` and inherited
+with `workspace = true`; features are added at the crate that needs them.
+Stable versions only — no release candidates.
+
+### Inside the `api` crate
+
+| Module        | Responsibility                                                       |
+| ------------- | -------------------------------------------------------------------- |
+| `dto/`        | Wire format: request payloads and response bodies.                   |
+| `error.rs`    | The single `ApiError` type; every handler returns `ApiResult<T>`.    |
+| `extract.rs`  | Crate-local extractors (`Json`, `Path`) rejecting through `ApiError`. |
+| `handler/`    | Business handlers only: extract input, call a service, map the result. |
+| `middleware/` | Cross-cutting layers: one module per concern, composed in `middleware::apply` via `tower::ServiceBuilder`. |
+| `router/`     | The only place where URLs are declared; also hosts the technical endpoints (health probes, 404 fallback) and the OpenAPI document (`ApiDoc` + Swagger UI). |
+| `server.rs`   | HTTP server bootstrap (`Server::new(addr, conn).run()`).             |
+| `service/`    | Business logic, split between `Query` (reads) and `Mutation` (writes). |
+| `state.rs`    | `AppState`, the dependencies shared with every handler.              |
 
 ## Boot and shutdown
 
@@ -72,6 +92,10 @@ TCP (NoDelayListener, TCP_NODELAY)
 
 Key properties, each enforced by one place in the code:
 
+- **Handlers stay thin.** They extract input through
+  `crate::extract::{Json, Path}`, call a service (`Query` for reads,
+  `Mutation` for writes) and map the result — handlers never touch the
+  database directly; database access belongs to services only.
 - **Every response is JSON.** Success bodies are typed DTOs or
   `Json<Value>`; every failure — business error, extractor rejection,
   unknown route, caught panic, probe failure — flows through the single
@@ -170,8 +194,8 @@ design:
 
 ## Extending the service
 
-Recipes, in the order the code expects them. The layout rules they follow
-are the contract in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Recipes, in the order the code expects them; each one follows the layout
+and design rules of the sections above.
 
 **Add an endpoint**
 
