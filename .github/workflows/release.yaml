@@ -67,8 +67,12 @@ permissions:
 jobs:
   image:
     name: build and push image
-    # Organization self-hosted runners (group "default"); the runner
-    # must provide a Docker daemon with BuildKit (Docker Engine 23+).
+    # Organization self-hosted runners (group "default"; the group must
+    # allow public repositories); the runner must provide a Docker
+    # daemon with BuildKit (Docker Engine 23+). Self-hosted is safe HERE
+    # and only here: this workflow never runs on pull requests — only on
+    # maintainer events (release published, manual dispatch, the
+    # release-please chain), so fork code can never reach these machines.
     runs-on: self-hosted
     steps:
       # Build the sources of the release tag, whichever event fired:

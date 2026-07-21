@@ -34,11 +34,19 @@ on:
 permissions:
   contents: read
 
+# One run per ref, same policy as the ci workflow: a new push cancels
+# the previous run on branches, never on main or the weekly schedule.
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   deny:
     name: cargo deny
-    # Organization self-hosted runners (group "default").
-    runs-on: self-hosted
+    # GitHub-hosted runner, never self-hosted: this workflow runs on
+    # fork PRs, and code from a fork must never execute on the
+    # organization's machines.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 

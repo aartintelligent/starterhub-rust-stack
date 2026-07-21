@@ -135,8 +135,8 @@ pipeline later, in everyone's face instead of yours.
 ## Pull requests
 
 1. Push your branch and open a PR against `main`.
-2. The `ci` workflow runs the quality gate (`just ci`) on the
-   organization's self-hosted runners. It must pass.
+2. The `ci` workflow runs the quality gate (`just ci`) on GitHub-hosted
+   runners. It must pass.
 3. Keep the PR **title** Conventional-Commit-shaped: the repository
    squash-merges, so the title becomes the commit that release-please
    reads on `main`.
@@ -174,14 +174,40 @@ rewrite literal strings.
 
 ### Infrastructure prerequisites
 
-- **Self-hosted runners** — every workflow targets `runs-on: self-hosted`
-  (the organization's "default" runner group). The runners need the `gh`
-  CLI (auto-merge) and a Docker daemon with BuildKit (image builds); the
-  quality gate bootstraps rustup itself if missing.
+- **Self-hosted runners** — only the `release` workflow (image build)
+  targets `runs-on: self-hosted` (the organization's "Default" runner
+  group, with public repositories allowed). Those runners need a Docker
+  daemon with BuildKit; every other workflow runs on GitHub-hosted
+  runners.
 - **Registry credentials** — `DHI_USERNAME` / `DHI_PASSWORD` repository
   secrets: the same Docker ID pulls the hardened base images from `dhi.io`
   and pushes to Docker Hub, so the token needs write access on the
   namespace.
+- **Coverage upload** — the `CODECOV_TOKEN` repository secret (the
+  repository upload token from codecov.io), used by internal branches;
+  fork PRs upload tokenless.
+- **`AUTOMATION_TOKEN`** (optional) — a fine-grained PAT (contents and
+  pull requests, read/write) used by release-please and the Dependabot
+  merge. Without it everything still works on the default
+  `GITHUB_TOKEN`, but GitHub's loop protection then keeps CI from
+  running on release PRs and on the pushes those merges produce.
+
+### Public repository posture
+
+The repository is public. The rules that keep it safe:
+
+- **PR-facing workflows (`ci`, `audit`, `ci-update`) run on
+  GitHub-hosted runners only**: fork PRs execute arbitrary code, which
+  must never reach the organization's machines. Never point a
+  `pull_request`-triggered job at `self-hosted`.
+- The `release*` workflows stay on the self-hosted runners: they only
+  run on maintainer events (push to `main`, release, manual dispatch).
+- Branch protection on `main` requires a pull request and the
+  `quality gate` and `coverage` checks. `cargo deny` is deliberately
+  not required: the audit only triggers when dependency files change,
+  and a required check that never reports would block every other PR.
+- Workflow runs from outside contributors wait for maintainer approval
+  (Settings > Actions).
 
 ## Notes for AI agents
 

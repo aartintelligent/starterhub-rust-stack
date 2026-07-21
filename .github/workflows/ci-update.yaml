@@ -1,14 +1,21 @@
 # Dependabot auto-merge.
 #
-# Enables GitHub auto-merge on Dependabot PRs for minor and patch
-# updates: the PR merges by itself once the required checks (the `ci`
-# workflow) are green. Major updates are left alone — they usually need
-# a human.
+# Merges Dependabot PRs for minor and patch updates once every other
+# check on the PR is green; majors are left to a human.
 #
-# Prerequisites on the repository:
-#   - Settings > General > "Allow auto-merge" enabled.
-#   - Branch protection on main with the `quality gate` check required,
-#     otherwise auto-merge fires before CI has proven anything.
+# The gate is enforced by this workflow itself — wait, then merge —
+# instead of GitHub's native auto-merge: required status checks need
+# branch protection, which is unavailable on a private repository under
+# the Free plan. The design stays correct once the repository is public
+# and branch protection is enabled: the merge then simply happens after
+# the same checks it just watched.
+#
+# The merge authenticates with AUTOMATION_TOKEN (an optional
+# fine-grained PAT, see CONTRIBUTING.md) when present, so the push to
+# main triggers the downstream workflows (ci, audit, release-please).
+# With the default GITHUB_TOKEN fallback the merge still works, but
+# GitHub's loop protection then skips those workflows until the next
+# human push to main.
 name: ci-update
 
 on: pull_request
@@ -23,9 +30,13 @@ jobs:
     # actor alone can differ on re-triggered events, and either check
     # failing means the PR is not trusted here.
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]'
-    # Organization self-hosted runners (group "default"); the runner
-    # must provide the `gh` CLI.
-    runs-on: self-hosted
+    # GitHub-hosted runner (ships the `gh` CLI), never self-hosted: the
+    # workflow triggers on pull_request, and the fork-safety rule is to
+    # keep every PR-facing job off the organization's machines.
+    runs-on: ubuntu-latest
+    # The wait below polls the PR checks; bound the worst case so a hung
+    # sibling workflow can never pin a runner forever.
+    timeout-minutes: 30
     steps:
       # Exposes the parsed update metadata (semver bump level, ecosystem)
       # of the Dependabot PR to the steps below.
@@ -34,9 +45,43 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge for minor and patch updates
+      # Poll every check on the PR except this workflow's own job (which
+      # would otherwise wait on itself). The set is discovered, not
+      # hard-coded: a dependency PR triggers `ci` always and `audit` only
+      # when manifest files change, and both are waited on when present.
+      - name: Wait for every other check to pass
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          while :; do
+            # `gh pr checks` exits non-zero while checks are pending or
+            # failed; the JSON is still printed, so capture it anyway.
+            summary=$(gh pr checks "$PR_URL" --json bucket,workflow --jq '
+              [.[] | select(.workflow != "ci-update")]
+              | "\(length) \([.[] | select(.bucket == "pending")] | length) \([.[] | select(.bucket == "fail" or .bucket == "cancel")] | length)"
+            ' || true)
+            read -r total pending failed <<<"${summary:-0 0 0}"
+
+            # No check registered yet means the sibling workflows have
+            # not started: keep waiting rather than merging blind.
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then
+              if [ "$failed" -eq 0 ]; then
+                echo "all $total checks green"
+                break
+              fi
+              echo "$failed check(s) failed, refusing to merge"
+              exit 1
+            fi
+
+            sleep 15
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+
+      - name: Merge minor and patch updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}

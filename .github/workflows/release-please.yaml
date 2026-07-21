@@ -11,10 +11,11 @@
 # default GITHUB_TOKEN, so the whole path — merge the release PR, tag,
 # build, publish — is automatic and needs no personal access token.
 #
-# Note: PRs opened with the default GITHUB_TOKEN do not trigger other
-# workflows (the same loop protection). If the `ci` workflow must run on
-# release PRs, replace the token below with a fine-grained PAT stored as
-# a repository secret.
+# The action authenticates with AUTOMATION_TOKEN (an optional
+# fine-grained PAT, see CONTRIBUTING.md) when present, so the release PR
+# it opens triggers the `ci` workflow like any other PR. With the
+# default GITHUB_TOKEN fallback everything still works, but GitHub's
+# loop protection keeps CI from running on release PRs.
 name: release-please
 
 on:
@@ -29,14 +30,15 @@ permissions:
 
 jobs:
   release-please:
-    # Organization self-hosted runners (group "default"); the runner
-    # must provide the `gh` CLI for the chain step.
-    runs-on: self-hosted
+    # GitHub-hosted runner (ships the `gh` CLI): the job is a handful of
+    # API calls, not worth an organization machine. Only the image build
+    # (the `release` workflow) stays on the self-hosted runners.
+    runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Ship the image of the release that was just tagged. `latest=true`
       # because this path only ever runs for the newest release; manual
