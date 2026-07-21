@@ -43,7 +43,7 @@ Cargo workspace (resolver 3) producing one binary, `ipam`. All metadata, depende
 
 **Cron (`cron` crate)** — jobs are unit structs in `cron/src/job/<name>.rs` implementing the object-safe `Job` trait (`name`, hard-coded `schedule`, `async run(&self, &AppState) -> JobResult`), listed in `job::roster()`. The generic wiring (`into_cron_job`, `execute`) adapts any `Job` to tokio-cron-scheduler; never duplicate it in a job. Adding a job = one new file + one line in the roster.
 
-**Naming collisions to know about** — several deliberate shadowings require qualified paths: the `entity` *crate* vs the `api::entity` *module* (import DB entities as `::entity::...` from `api`); `tokio_cron_scheduler::Job` vs the local `Job` trait (aliased `CronJob`); the two `Server` structs (aliased `ApiServer`/`CronServer` in `main.rs`); the `config` crate vs `common::config` (use fully-qualified `config::Config::builder()`).
+**Naming collisions to know about** — several deliberate shadowings require qualified paths: `tokio_cron_scheduler::Job` vs the local `Job` trait (aliased `CronJob`); the two `Server` structs (aliased `ApiServer`/`CronServer` in `main.rs`); the `config` crate vs `common::config` (use fully-qualified `config::Config::builder()`). Database entities live only in the `entity` crate — the `api` crate has no `entity` module.
 
 ## Non-negotiables (enforced by `just ci`)
 

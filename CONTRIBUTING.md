@@ -27,7 +27,6 @@ metadata, dependencies and lints from the root `Cargo.toml`
 | Module        | Responsibility                                                      |
 | ------------- | ------------------------------------------------------------------- |
 | `dto/`        | Wire format: request payloads and response bodies.                  |
-| `entity/`     | API-side domain models, decoupled from the database schema.         |
 | `error.rs`    | The single `ApiError` type; every handler returns `ApiResult<T>`.   |
 | `extract.rs`  | Crate-local extractors (`Json`, `Path`) rejecting through `ApiError`. |
 | `handler/`    | Business handlers only: extract input, call a service, map the result. |
@@ -86,9 +85,9 @@ Hard rules:
   has shipped: add a new one. Migrations run automatically at boot; the
   CLI (`cargo run -p migration -- <command>`) uses the same configuration
   as the API.
-- **Database entities** go to `entity/src/`, re-exported in
-  `entity/src/prelude.rs`. From the `api` crate, import them as
-  `::entity::...` to disambiguate from the local `entity` module.
+- **Database entities** go to the `entity` crate (`entity/src/`, one
+  module per table), re-exported in `entity/src/prelude.rs` — the single
+  home for data models; the `api` crate defines no entity of its own.
 - **Cron jobs** live in `cron/src/job/`, one module per job: a unit
   struct implementing the `Job` trait (`name`, hard-coded `schedule`,
   async `run(&self, state) -> JobResult`), added to `job::roster`, the
