@@ -12,8 +12,20 @@
 //!    separator, e.g. `APP_DATABASE__POOL__MAX_CONNECTIONS=50`.
 
 use config::{Environment, File, FileFormat};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+
+/// Characters escaped when embedding a value into the connection URL:
+/// everything except ASCII alphanumerics and the RFC 3986 unreserved
+/// marks (`-`, `.`, `_`, `~`). Escaping more than strictly required is
+/// always safe, while an unescaped `@`, `:`, `/` or `%` in a credential
+/// silently corrupts the URL.
+const URL_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
 
 /// HTTP server settings (`server.*`).
 #[derive(Debug, Clone, Deserialize)]
@@ -74,14 +86,18 @@ impl Postgresql {
     /// Returned as a [`SecretString`] because it embeds the password:
     /// the secret stays protected end to end, and only the final consumer
     /// (the connection builder) exposes it, at the last possible moment.
+    ///
+    /// Username, password and database name are percent-encoded so
+    /// credentials containing URL-significant characters (`@`, `:`, `/`,
+    /// `%`, ...) survive the round-trip through the URL syntax.
     pub fn url(&self) -> SecretString {
         SecretString::from(format!(
             "postgres://{}:{}@{}:{}/{}",
-            self.username,
-            self.password.expose_secret(),
+            utf8_percent_encode(&self.username, URL_ENCODE_SET),
+            utf8_percent_encode(self.password.expose_secret(), URL_ENCODE_SET),
             self.host,
             self.port,
-            self.database
+            utf8_percent_encode(&self.database, URL_ENCODE_SET),
         ))
     }
 }
@@ -146,8 +162,11 @@ impl Config {
             .set_default("database.pool.min_connections", 5)?
             .set_default("database.pool.connect_timeout", 8)?
             .set_default("database.pool.acquire_timeout", 8)?
-            .set_default("database.pool.idle_timeout", 8)?
-            .set_default("database.pool.max_lifetime", 8)?
+            // Idle and lifetime run on a different scale than the two
+            // timeouts above: seconds here would recycle every connection
+            // permanently under load.
+            .set_default("database.pool.idle_timeout", 600)?
+            .set_default("database.pool.max_lifetime", 1800)?
             // Layer 2 — optional system file, at the FHS-compliant path
             // for the Debian 13 / Docker deployment target: `/etc/<app>/`
             // is where a packaged service reads its configuration.

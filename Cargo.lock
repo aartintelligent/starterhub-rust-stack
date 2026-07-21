@@ -669,6 +669,7 @@ dependencies = [
  "anyhow",
  "config",
  "dotenvy",
+ "percent-encoding",
  "sea-orm",
  "secrecy",
  "serde",
