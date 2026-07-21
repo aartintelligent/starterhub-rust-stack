@@ -21,8 +21,8 @@ flamegraph.svg
 *.so
 
 # ---- Editors / IDE ----
-# Claude Code session-local state
-.claude/
+# Claude Code local overrides (the rest of .claude/ is versioned)
+.claude/settings.local.json
 
 # VS Code
 .vscode/
