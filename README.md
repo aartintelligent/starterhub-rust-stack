@@ -1,5 +1,11 @@
 # starterhub-rust-stack
 
+[![ci](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/ci.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/ci.yaml)
+[![audit](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/audit.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/audit.yaml)
+[![release](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/release.yaml/badge.svg)](https://github.com/aartintelligent/starterhub-rust-stack/actions/workflows/release.yaml)
+[![codecov](https://codecov.io/gh/aartintelligent/starterhub-rust-stack/graph/badge.svg?token=rZyaU31eyI)](https://codecov.io/gh/aartintelligent/starterhub-rust-stack)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 The foundation for Rust service stacks: a production-grade starter you
 instantiate to begin every new service — not a demo, a **runnable,
 released, containerized service** with the boring-but-vital parts already
