@@ -182,6 +182,28 @@ rewrite literal strings.
   secrets: the same Docker ID pulls the hardened base images from `dhi.io`
   and pushes to Docker Hub, so the token needs write access on the
   namespace.
+- **Coverage upload** — the `CODECOV_TOKEN` repository secret (the
+  repository upload token from codecov.io): the repository is private,
+  so tokenless uploads are not accepted.
+- **`AUTOMATION_TOKEN`** (optional) — a fine-grained PAT (contents and
+  pull requests, read/write) used by release-please and the Dependabot
+  merge. Without it everything still works on the default
+  `GITHUB_TOKEN`, but GitHub's loop protection then keeps CI from
+  running on release PRs and on the pushes those merges produce.
+
+### Going public
+
+The repository is meant to become public. Before flipping the switch:
+
+1. **Move `ci`, `audit` and `ci-update` off the self-hosted runners**
+   (or restrict fork workflows): on a public repository, fork PRs run
+   arbitrary code, which must never reach the organization's machines.
+   The `release*` workflows only run on maintainer events and may stay.
+2. **Enable branch protection on `main`** (free on public repositories):
+   require a pull request and the `quality gate`, `coverage` and
+   `cargo deny` checks. The Dependabot merge flow keeps working as is.
+3. **Codecov**: nothing to change — fork PRs upload tokenless, internal
+   branches keep using `CODECOV_TOKEN`.
 
 ## Notes for AI agents
 
