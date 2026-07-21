@@ -15,8 +15,11 @@ use sea_orm_migration::prelude::*;
 #[tokio::main]
 async fn main() {
     // Resolve the configuration up front: the CLI is useless without a
-    // database target, so a malformed source must abort immediately.
-    let config = Config::load().expect("failed to load configuration");
+    // database target, so a malformed source must abort immediately. The
+    // identity defaults expand here and thus describe this CLI, which is
+    // accurate: it is its own executable.
+    let config = Config::load(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+        .expect("failed to load configuration");
 
     // Delegate to the sea-orm-migration CLI, but keep control of the
     // connection: injecting our own factory guarantees the CLI reaches the
