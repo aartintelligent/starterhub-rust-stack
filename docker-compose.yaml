@@ -8,8 +8,9 @@
 services:
   postgres:
     # Debian-based official image (Trixie = Debian 13, the deployment
-    # target of the project); major 17 is a stable, long-supported line
-    # (PostgreSQL majors receive 5 years of fixes).
+    # target of the project); the major tracks the current stable line
+    # (PostgreSQL majors receive 5 years of fixes) and is bumped by
+    # Dependabot.
     image: postgres:18-trixie
     container_name: starterhub-rust-stack-postgres
     restart: unless-stopped

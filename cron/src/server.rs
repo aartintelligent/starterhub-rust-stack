@@ -47,8 +47,10 @@ impl Server {
 
     /// Starts ticking, then waits for `shutdown` and stops cleanly.
     ///
-    /// A clean stop matters: it gives running jobs a chance to finish
-    /// instead of being killed mid-flight by the process exit.
+    /// A clean stop halts the tick loop so no new job fires during the
+    /// shutdown window. Jobs already in flight run as detached tasks the
+    /// scheduler does not await: a long-running job can still be cut by
+    /// the process exit, so keep job bodies short or idempotent.
     ///
     /// # Errors
     ///
@@ -76,9 +78,11 @@ impl Server {
         // show exactly which phase we died in.
         tracing::info!("cron engine shutting down");
 
-        // Explicit engine shutdown rather than dropping it: running jobs
-        // get their chance to finish instead of being killed mid-flight
-        // by the process exit.
+        // Explicit engine shutdown rather than dropping it: the tick
+        // loop stops cleanly and no new job fires. In-flight jobs are
+        // detached tasks the scheduler does not await — the process exit
+        // may still cut one, which is why job bodies must stay short or
+        // idempotent.
         self.inner
             .shutdown()
             .await
