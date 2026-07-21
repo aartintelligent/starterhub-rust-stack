@@ -1,22 +1,47 @@
-# Keep the build context minimal and free of secrets: only what
-# `cargo build` needs may reach the daemon.
+# Docker build context filter.
+#
+# Two goals: keep secrets out of the daemon, and keep the `COPY . .`
+# layer stable — the Dockerfile copies the whole context, so any file
+# listed here can change without invalidating the compiled layers.
+# Only what `cargo build` needs may reach the build.
+#
+# Caveat: sources embedded at compile time (include_str!) must NOT be
+# listed here; as of today the crates embed nothing.
 
 # Build artifacts (the image rebuilds from source, caches live in BuildKit)
 target/
 
-# Version control and IDE state
+# Version control and forge configuration
 .git/
+.github/
+.gitignore
+
+# AI assistant workspace and guidance
+.claude/
+CLAUDE.md
+
+# IDE / editor state
 .idea/
 .vscode/
+*.code-workspace
 
 # Local environment and configuration overrides (secrets never enter the
 # build context; runtime configuration is injected at deploy time)
 .env
 .env.*
-!.env.example
 app-config.json
 
 # Container tooling itself
 Dockerfile
 docker-compose.yaml
 .dockerignore
+
+# Developer tooling, release automation and documentation — irrelevant
+# to the compilation
+justfile
+rustfmt.toml
+clippy.toml
+release-please-config.json
+.release-please-manifest.json
+LICENSE
+*.md
