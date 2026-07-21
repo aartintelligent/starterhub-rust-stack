@@ -89,9 +89,10 @@ hard-coded defaults → optional `/etc/starterhub-rust-stack/app-config.json`
 → optional local `app-config.json` (never committed) → `APP_*` environment
 variables (`__` as nesting separator).
 
-The `environment` key (`local`, `development`, `staging`, `production`)
-drives environment-dependent behavior such as exposing `/docs`; it
-defaults to `local`, and the Docker image overrides it to `production`.
+The `environment` key (strictly `local`, `development`, `staging` or
+`production` — any other spelling aborts the boot) drives
+environment-dependent behavior such as exposing `/docs`; it defaults to
+`local`, and the Docker image overrides it to `production`.
 
 Secrets are `secrecy::SecretString`, exposed with `expose_secret()` at
 exactly one place. Every variable is documented in

@@ -65,19 +65,29 @@ fn malformed_override_fails_the_load() {
     });
 }
 
-/// The environment accepts the documented short and uppercase spellings.
+/// The environment is strict: exactly the four canonical lowercase
+/// spellings deserialize, every historical alias or case variant
+/// aborts the load — a typo must never guess an environment.
 #[test]
-fn environment_accepts_common_spellings() {
+fn environment_is_strict() {
     for (spelling, expected) in [
-        ("dev", Environment::Development),
-        ("DEV", Environment::Development),
+        ("local", Environment::Local),
+        ("development", Environment::Development),
         ("staging", Environment::Staging),
-        ("PROD", Environment::Production),
-        ("LOCAL", Environment::Local),
+        ("production", Environment::Production),
     ] {
         let config = load_with(&[("APP_ENVIRONMENT", Some(spelling))]);
 
         assert_eq!(config.environment, expected, "spelling {spelling:?}");
+    }
+
+    for spelling in ["LOCAL", "PRODUCTION", "dev", "DEV", "prod", "Staging", ""] {
+        temp_env::with_vars([("APP_ENVIRONMENT", Some(spelling))], || {
+            assert!(
+                Config::load("under-test", "0.0.0").is_err(),
+                "spelling {spelling:?} must be rejected"
+            );
+        });
     }
 }
 

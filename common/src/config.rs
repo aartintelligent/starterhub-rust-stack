@@ -35,22 +35,23 @@ const URL_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
 ///
 /// Drives environment-dependent behavior — e.g. the interactive API
 /// documentation is only exposed in [`Environment::Local`] and
-/// [`Environment::Development`]. Common short and uppercase spellings
-/// are accepted (`dev`, `DEV`, `prod`, `PROD`, ...).
+/// [`Environment::Development`].
+///
+/// Strict on purpose: exactly `local`, `development`, `staging` or
+/// `production`, nothing else — no short forms, no case variants. A
+/// typo in this value silently flips security-relevant behavior (docs
+/// exposure today, more tomorrow), so it must abort the boot instead
+/// of deserializing into a guess.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Environment {
     /// Developer workstation.
-    #[serde(alias = "LOCAL")]
     Local,
     /// Shared development / integration deployment.
-    #[serde(alias = "dev", alias = "DEV", alias = "DEVELOPMENT")]
     Development,
     /// Pre-production deployment.
-    #[serde(alias = "STAGING")]
     Staging,
     /// Production deployment.
-    #[serde(alias = "prod", alias = "PROD", alias = "PRODUCTION")]
     Production,
 }
 
