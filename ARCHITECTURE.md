@@ -119,9 +119,11 @@ scheduler and is never duplicated.
   configuration defaults.
 - **Image**: the `Dockerfile` builds a minimal, hardened runtime
   (non-root, no shell, port 8080).
-- **CI/CD**: every PR runs the quality gate; release-please derives
-  versions from the commit history; the `release` workflow publishes the
-  image to Docker Hub with semver tags.
+- **CI/CD**: every PR runs the quality gate; a `cargo-deny` audit
+  (advisories, licenses, sources — configuration in `deny.toml`) runs on
+  dependency changes and weekly; release-please derives versions from the
+  commit history; the `release` workflow publishes the image to Docker
+  Hub with semver tags.
 
 ## Extending the service
 

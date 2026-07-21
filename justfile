@@ -45,6 +45,11 @@ lint:
 test:
     cargo test --workspace
 
+# Audit the dependency tree (advisories, licenses, bans, sources).
+# Requires cargo-deny: `cargo install cargo-deny`.
+deny:
+    cargo deny check
+
 # Run the sea-orm-migration CLI, e.g. `just migrate up`, `just migrate status`.
 migrate *args:
     cargo run -p migration -- {{args}}

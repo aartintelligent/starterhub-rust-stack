@@ -25,6 +25,8 @@ rule.
 - [lefthook](https://lefthook.dev) and
   [committed](https://github.com/crate-ci/committed) — only if you install
   the git hooks (recommended, see below).
+- [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) — optional,
+  for the local dependency audit (`just deny`); CI runs it anyway.
 
 ## Getting started
 
