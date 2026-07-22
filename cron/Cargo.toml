@@ -21,8 +21,13 @@ thiserror            = { workspace = true }
 tokio-cron-scheduler = { workspace = true }
 tracing              = { workspace = true }
 
+# `sync` provides the per-job semaphore enforcing the overlap policy.
+[dependencies.tokio]
+features  = ["sync"]
+workspace = true
+
 [dev-dependencies]
-# `sync` and `time` serve the engine-tick test: a notification signalling
+# `sync` and `time` serve the engine-tick test: a notification signaling
 # the execution and a bounded wait for it.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 

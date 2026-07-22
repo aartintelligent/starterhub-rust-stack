@@ -106,6 +106,12 @@ trait — `name()`, a **hard-coded** `schedule()`, `async run(&self,
 code, not configuration. The generic wiring adapts any `Job` to the
 scheduler and is never duplicated.
 
+A job also declares an `Overlap` policy (`overlap()`): by default a tick
+firing while the previous run is still in flight is skipped and logged,
+so a slow job never overlaps itself; a job opts into concurrency with
+`Overlap::Allow`. The guard is per-process — running several instances
+of the binary would need a distributed lock.
+
 ## Database and migrations
 
 - Entities live in the `entity` crate only, re-exported in
