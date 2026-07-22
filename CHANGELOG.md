@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v1.0.0...v1.1.0) (2026-07-22)
+
+
+### Features
+
+* **cron:** log the hello job at info level ([#43](https://github.com/aartintelligent/starterhub-rust-stack/issues/43)) ([523c47d](https://github.com/aartintelligent/starterhub-rust-stack/commit/523c47dc6880fac850e5120ae39d6833b0911f7b))
+* **cron:** skip overlapping job runs by default ([#41](https://github.com/aartintelligent/starterhub-rust-stack/issues/41)) ([62bcb65](https://github.com/aartintelligent/starterhub-rust-stack/commit/62bcb65a7a14f29b758e8ed24b9630968654212a))
+
 ## [1.0.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v0.7.0...v1.0.0) (2026-07-21)
 
 
