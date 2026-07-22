@@ -21,9 +21,15 @@ thiserror            = { workspace = true }
 tokio-cron-scheduler = { workspace = true }
 tracing              = { workspace = true }
 
-# `sync` provides the per-job semaphore enforcing the overlap policy.
+# `sync` provides the per-job semaphore enforcing the overlap policy;
+# `time` provides the per-run budget cancelling a stuck job.
 [dependencies.tokio]
-features  = ["sync"]
+features  = ["sync", "time"]
+workspace = true
+
+# `rt` provides the TaskTracker draining in-flight runs at shutdown.
+[dependencies.tokio-util]
+features  = ["rt"]
 workspace = true
 
 [dev-dependencies]
