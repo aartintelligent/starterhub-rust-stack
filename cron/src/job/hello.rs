@@ -1,4 +1,4 @@
-//! Hello job: the simplest possible job, a trace line per tick.
+//! Hello job: the simplest possible job, a log line per tick.
 //!
 //! Serves as the reference implementation for new jobs: copy this file,
 //! adjust the name, schedule and `run` body, then add the struct to
@@ -23,11 +23,11 @@ impl Job for Hello {
     }
 
     async fn run(&self, _state: &AppState) -> JobResult {
-        // A single trace line is the whole job: enough to see the cron
-        // engine ticking. DEBUG, not INFO: a per-minute heartbeat would
-        // add 1440 noise lines a day to production logs; opt in with
-        // APP_DEBUG=true (or RUST_LOG) when observing the engine.
-        tracing::debug!("hello from the cron engine");
+        // A single log line is the whole job: enough to see the cron
+        // engine ticking. INFO on purpose: this is the template's sample
+        // job, meant to be visible out of the box — anyone building on
+        // the template replaces it (and its noise) with real jobs.
+        tracing::info!("hello from the cron engine");
 
         Ok(())
     }
