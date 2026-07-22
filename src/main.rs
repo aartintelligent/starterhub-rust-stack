@@ -33,7 +33,13 @@ use tokio_util::sync::CancellationToken;
 ///    token, then supervise both until the process stops.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Resolve the configuration first: every subsequent step depends on it,
+    // Populate the process environment from `./.env` first: loading
+    // environment files is the executable's concern, kept out of
+    // `Config::load` so the library stays pure and its tests hermetic.
+    // A malformed `.env` aborts the boot loudly.
+    common::config::load_dotenv()?;
+
+    // Resolve the configuration next: every subsequent step depends on it,
     // and a malformed source must abort the boot before anything starts.
     // The env! macros expand HERE, in the binary crate, so the identity
     // defaults are the real executable name and version from Cargo.toml.

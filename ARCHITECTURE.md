@@ -85,14 +85,19 @@ Rules:
 ## Configuration
 
 Typed structs in `common/src/config.rs`, merged in ascending priority:
-hard-coded defaults → optional `/etc/starterhub-rust-stack/app-config.json`
-→ optional local `app-config.json` (never committed) → `APP_*` environment
-variables (`__` as nesting separator).
+hard-coded defaults → optional `/etc/<name>/app-config.json` → optional
+local `app-config.json` (never committed) → `APP_*` environment
+variables (`__` as nesting separator). The tree is strict: an unknown
+key or a failed cross-field invariant (`Config::validate`) aborts the
+boot. `./.env` is loaded by the **binaries** through
+`config::load_dotenv` — never by the library, so its tests stay
+hermetic; a present but malformed `.env` aborts the boot.
 
 The `environment` key (strictly `local`, `development`, `staging` or
 `production` — any other spelling aborts the boot) drives
 environment-dependent behavior such as exposing `/docs`; it defaults to
-`local`, and the Docker image overrides it to `production`.
+`local`, the Docker image overrides it to `production`, and production
+refuses to boot with the default database password.
 
 Secrets are `secrecy::SecretString`, exposed with `expose_secret()` at
 exactly one place. Every variable is documented in

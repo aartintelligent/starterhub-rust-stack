@@ -1,5 +1,6 @@
 //! Tracing/logging initialisation.
 
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Installs the global tracing subscriber.
@@ -19,12 +20,24 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 pub fn init(debug: bool) {
     // Translate the configuration flag into a filter directive; INFO is the
     // quiet default, DEBUG the opt-in verbose mode.
-    let default_level = if debug { "debug" } else { "info" };
+    let default_level = if debug {
+        LevelFilter::DEBUG
+    } else {
+        LevelFilter::INFO
+    };
 
     tracing_subscriber::registry()
         // `RUST_LOG` wins when present: an operator must be able to raise
         // verbosity per module at runtime without editing configuration.
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_level)))
+        // Lossy parse on purpose: one invalid directive in an incident
+        // commander's RUST_LOG must not silently throw away the whole
+        // filter — the valid directives survive and the invalid one is
+        // reported on stderr.
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(default_level.into())
+                .from_env_lossy(),
+        )
         // Human-readable console output; add JSON/OTel layers here later
         // without touching any call site.
         .with(fmt::layer())
