@@ -37,13 +37,16 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
-# Lint the whole workspace, warnings are errors.
+# Lint the whole workspace, warnings are errors. `--locked` because this
+# recipe is part of the CI gate: a Cargo.lock drifted from the manifests
+# must fail here, not at the release image build — the only other place
+# it is enforced, after tagging, where a failure is unreviewable.
 lint:
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets --locked -- -D warnings
 
-# Run every test of the workspace.
+# Run every test of the workspace (`--locked`: same rationale as lint).
 test:
-    cargo test --workspace
+    cargo test --workspace --locked
 
 # Audit the dependency tree (advisories, licenses, bans, sources).
 # Requires cargo-deny: `cargo install cargo-deny`.

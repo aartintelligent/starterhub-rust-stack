@@ -139,7 +139,9 @@ pipeline later, in everyone's face instead of yours.
    runners. It must pass.
 3. Keep the PR **title** Conventional-Commit-shaped: the repository
    squash-merges, so the title becomes the commit that release-please
-   reads on `main`.
+   reads on `main`. The `pr` workflow enforces this with the same
+   `committed` rules as the local hook — the one artifact the hook
+   cannot protect.
 4. Merge by **squash** once the gate is green; the branch is deleted
    automatically.
 
