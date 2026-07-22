@@ -40,7 +40,7 @@ jobs:
     steps:
       # Exposes the parsed update metadata (semver bump level, ecosystem)
       # of the Dependabot PR to the steps below.
-      - uses: dependabot/fetch-metadata@v3
+      - uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
         id: metadata
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,13 +57,16 @@ jobs:
             # failed; the JSON is still printed, so capture it anyway.
             summary=$(gh pr checks "$PR_URL" --json bucket,workflow --jq '
               [.[] | select(.workflow != "ci-update")]
-              | "\(length) \([.[] | select(.bucket == "pending")] | length) \([.[] | select(.bucket == "fail" or .bucket == "cancel")] | length)"
+              | "\(length) \([.[] | select(.bucket == "pending")] | length) \([.[] | select(.bucket == "fail" or .bucket == "cancel")] | length) \([.[] | select(.workflow == "ci")] | length)"
             ' || true)
-            read -r total pending failed <<<"${summary:-0 0 0}"
+            read -r total pending failed ci <<<"${summary:-0 0 0 0}"
 
-            # No check registered yet means the sibling workflows have
-            # not started: keep waiting rather than merging blind.
-            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then
+            # Floor on the expected set: the `ci` workflow always runs on
+            # a PR and registers two jobs (gate + coverage). Requiring
+            # both closes the race where merging happened on whichever
+            # subset of checks was registered first, before slower
+            # workflows (audit on a runner backlog) even appeared.
+            if [ "$total" -gt 0 ] && [ "$ci" -ge 2 ] && [ "$pending" -eq 0 ]; then
               if [ "$failed" -eq 0 ]; then
                 echo "all $total checks green"
                 break

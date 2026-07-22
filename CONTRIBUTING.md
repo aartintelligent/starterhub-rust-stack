@@ -202,8 +202,14 @@ The repository is public. The rules that keep it safe:
   GitHub-hosted runners only**: fork PRs execute arbitrary code, which
   must never reach the organization's machines. Never point a
   `pull_request`-triggered job at `self-hosted`.
-- The `release*` workflows stay on the self-hosted runners: they only
-  run on maintainer events (push to `main`, release, manual dispatch).
+- The `release` image build stays on the self-hosted runners: it only
+  runs on maintainer events (release, manual dispatch, the
+  release-please chain). The `release-please` job itself is a handful
+  of API calls and runs hosted.
+- Third-party actions are pinned by **commit SHA** (with the version as
+  a trailing comment): a hijacked action tag in the release path would
+  otherwise reach the Docker Hub credentials. Dependabot keeps the pins
+  fresh.
 - Branch protection on `main` requires a pull request and the
   `quality gate` and `coverage` checks. `cargo deny` is deliberately
   not required: the audit only triggers when dependency files change,

@@ -19,7 +19,10 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_DB: app
     ports:
-      - "5432:5432"
+      # Loopback only: the container runs with the template's root/root
+      # credentials, which must never be reachable from the LAN a
+      # development machine happens to sit on.
+      - "127.0.0.1:5432:5432"
     volumes:
       # Named volume: the data survives `docker compose down`; wipe it
       # explicitly with `docker compose down -v` when a fresh database
