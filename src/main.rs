@@ -15,7 +15,6 @@ use api::server::Server as ApiServer;
 use common::{config::Config, infrastructure::postgresql, telemetry};
 use cron::server::Server as CronServer;
 use cron::state::AppState;
-use migration::{Migrator, MigratorTrait};
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -76,11 +75,13 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to connect to PostgreSQL")?;
 
     // Bring the schema up to date before accepting any traffic, so the
-    // running code and the database are always aligned. Signal handling
-    // is not installed yet, so a SIGTERM here kills the process via the
-    // default disposition — safe, because sea-orm wraps each migration
-    // in a transaction: the schema is migrated or not, never half-way.
-    Migrator::up(&conn, None)
+    // running code and the database are always aligned — under an
+    // advisory lock, so concurrently booting replicas serialize instead
+    // of colliding on the same pending migration. Signal handling is not
+    // installed yet, so a SIGTERM here kills the process via the default
+    // disposition — safe, because the whole run is transactional: the
+    // schema is migrated or not, never half-way.
+    migration::up_guarded(&conn)
         .await
         .context("failed to apply database migrations")?;
 
