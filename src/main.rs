@@ -16,10 +16,17 @@ use common::{config::Config, infrastructure::postgresql, telemetry};
 use cron::server::Server as CronServer;
 use cron::state::AppState;
 use migration::{Migrator, MigratorTrait};
-use tokio::signal::ctrl_c;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+
+/// Grace between the shutdown order and a forced exit. Longer than every
+/// component-level drain fence (the cron engine waits at most 30 s for
+/// in-flight jobs, the API bounds its connections by the request
+/// timeout), so this fence only fires on a genuine hang — and the
+/// process still dies deterministically instead of waiting for
+/// systemd's SIGKILL.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(45);
 
 /// Boots the application.
 ///
@@ -69,7 +76,10 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to connect to PostgreSQL")?;
 
     // Bring the schema up to date before accepting any traffic, so the
-    // running code and the database are always aligned.
+    // running code and the database are always aligned. Signal handling
+    // is not installed yet, so a SIGTERM here kills the process via the
+    // default disposition — safe, because sea-orm wraps each migration
+    // in a transaction: the schema is migrated or not, never half-way.
     Migrator::up(&conn, None)
         .await
         .context("failed to apply database migrations")?;
@@ -84,14 +94,43 @@ async fn main() -> anyhow::Result<()> {
     // exactly one definition process-wide.
     let shutdown = CancellationToken::new();
 
+    // Install both signal streams HERE, before anything is spawned: if
+    // the signal driver is broken, the boot must fail with a clean error
+    // — not panic later inside a detached task, which would leave the
+    // process running with graceful stop permanently impossible (tokio
+    // signal registration is process-wide and irreversible).
+    let sigint = signal(SignalKind::interrupt()).context("failed to install the SIGINT handler")?;
+    let sigterm =
+        signal(SignalKind::terminate()).context("failed to install the SIGTERM handler")?;
+
     // Bridge Unix signals to the token from a dedicated task; it needs no
     // supervision, cancelling is idempotent and the task dies with the
     // process.
     tokio::spawn({
         let shutdown = shutdown.clone();
         async move {
-            shutdown_signal().await;
+            let (mut sigint, mut sigterm) = (sigint, sigterm);
+
+            // First signal: order the graceful stop. Which one arrived
+            // is worth a log line because it tells operators who
+            // initiated it.
+            tokio::select! {
+                _ = sigint.recv() => tracing::info!("received SIGINT, shutting down"),
+                _ = sigterm.recv() => tracing::info!("received SIGTERM, shutting down"),
+            }
             shutdown.cancel();
+
+            // Second signal: the operator insists — exit right now.
+            // Without this escalation, every further Ctrl-C would be
+            // silently swallowed (the handlers above are permanent) and
+            // a hung shutdown could only be ended by SIGKILL from
+            // another terminal.
+            tokio::select! {
+                _ = sigint.recv() => {}
+                _ = sigterm.recv() => {}
+            }
+            tracing::error!("second signal received, exiting immediately");
+            std::process::exit(130);
         }
     });
 
@@ -116,14 +155,29 @@ async fn main() -> anyhow::Result<()> {
     // Supervise both: whichever stops first — crash, error or graceful —
     // cancels the token so the sibling stops too. `join!` (not `try_join!`)
     // then guarantees both components fully terminated before we return,
-    // which is what makes the shutdown actually graceful.
-    let (api_result, cron_result) = tokio::join!(
-        supervise("http-server", api_handle, &shutdown),
-        supervise("cron", cron_handle, &shutdown),
-    );
+    // which is what makes the shutdown actually graceful. The whole wait
+    // is fenced: once the shutdown order is out, components get
+    // `SHUTDOWN_GRACE` to drain before the process exits anyway — a hung
+    // component must never turn "systemctl stop" into a SIGKILL timeout.
+    let (api_result, cron_result) = tokio::select! {
+        results = async {
+            tokio::join!(
+                supervise("http-server", api_handle, &shutdown),
+                supervise("cron", cron_handle, &shutdown),
+            )
+        } => results,
+        () = async {
+            shutdown.cancelled().await;
+            tokio::time::sleep(SHUTDOWN_GRACE).await;
+        } => {
+            tracing::error!(grace = ?SHUTDOWN_GRACE, "components still running after the shutdown grace, exiting");
+            std::process::exit(1);
+        }
+    };
 
-    // Surface the first failure only after both components are down: exit
-    // code and logs then reflect the root cause, not a shutdown artefact.
+    // Surface a failure only after both components are down. Both errors
+    // were already logged individually by `supervise`, so nothing is
+    // lost when only one of them can become the exit status.
     api_result.and(cron_result)?;
 
     // Both components stopped cleanly: log it so operators can tell a
@@ -151,38 +205,17 @@ async fn supervise(
         }
     };
 
+    // Log the failure here, per component: when both fail, only one
+    // error can become the process exit status — this line is what
+    // preserves the other one (potentially the root cause).
+    if let Err(error) = &result {
+        tracing::error!(component = name, error = %format_args!("{error:#}"), "component stopped with an error");
+    }
+
     // Idempotent: on a signal-initiated stop the token is already
     // canceled and this is a no-op; on a crash it is what stops the
     // sibling component.
     shutdown.cancel();
 
     result
-}
-
-/// Resolves once the process receives SIGTERM or SIGINT.
-///
-/// SIGTERM is what systemd sends on `systemctl stop` (Debian deployment
-/// target); SIGINT covers Ctrl-C during local development. Installing a
-/// handler only fails on exotic setups (e.g. no signal driver): better to
-/// crash than to run unstoppable.
-async fn shutdown_signal() {
-    // Two symmetric one-shot futures: `ctrl_c` is Tokio's portable SIGINT
-    // helper, SIGTERM goes through the Unix API. Each block installs its
-    // handler and waits, so nothing outlives the select below.
-    let sigint = async {
-        ctrl_c().await.expect("failed to install SIGINT handler");
-    };
-    let sigterm = async {
-        signal(SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-
-    // First signal wins; which one arrived is worth a log line because it
-    // tells operators who initiated the stop.
-    tokio::select! {
-        () = sigint => tracing::info!("received SIGINT, shutting down"),
-        () = sigterm => tracing::info!("received SIGTERM, shutting down"),
-    }
 }
