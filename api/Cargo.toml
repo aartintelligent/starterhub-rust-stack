@@ -19,7 +19,6 @@ axum       = { workspace = true, features = ["macros", "tokio"] }
 # Hand-rolled serve loop (see server.rs): `axum::serve` exposes no
 # header-read timeout, which is the slowloris guard.
 hyper-util = { workspace = true, features = ["server-auto", "server-graceful", "service", "tokio"] }
-entity     = { workspace = true }
 serde      = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror  = { workspace = true }

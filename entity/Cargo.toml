@@ -13,8 +13,8 @@ path = "src/lib.rs"
 [lints]
 workspace = true
 
+# No dependencies while the crate ships empty: dead placeholder deps
+# would accumulate invisibly (nothing gates unused dependencies). The
+# first real entity brings `sea-orm` (+ `serde` with `derive`) back from
+# the workspace table, and re-links `entity` in the consuming crates.
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
-
-[dependencies.sea-orm]
-workspace = true

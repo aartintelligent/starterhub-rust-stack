@@ -155,7 +155,9 @@ of the binary would need a distributed lock.
 
 **Add a migration** — `just migrate-generate <label>`, move the file into
 `migration/src/source/`, register it in `Migrator::migrations`, model the
-entity in `entity`.
+entity in `entity`. The `entity` crate ships empty and dependency-free:
+the first entity brings `sea-orm` (+ `serde`) back into its manifest and
+re-links `entity` in the crates that consume it (`api`, `migration`).
 
 **Add a configuration key** — field in `common/src/config.rs`, a default
 in `Config::load`, a commented line in `.env.example`.

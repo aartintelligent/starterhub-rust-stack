@@ -16,7 +16,6 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 common = { workspace = true }
-entity = { workspace = true }
 tokio  = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [dependencies.sea-orm-migration]
