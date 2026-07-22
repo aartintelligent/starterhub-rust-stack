@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.1](https://github.com/aartintelligent/starterhub-rust-stack/compare/v1.1.0...v1.1.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* **api:** close the non-JSON and slow-client gaps ([#46](https://github.com/aartintelligent/starterhub-rust-stack/issues/46)) ([762cefd](https://github.com/aartintelligent/starterhub-rust-stack/commit/762cefd201cb09414efc918a20af642585b2dc0c))
+* **config:** make loading strict, lossless and hermetic ([#45](https://github.com/aartintelligent/starterhub-rust-stack/issues/45)) ([401ef04](https://github.com/aartintelligent/starterhub-rust-stack/commit/401ef04743d4df23b370308c33d30d1b5a13d27b))
+* **cron:** bound job runs and drain them at shutdown ([#47](https://github.com/aartintelligent/starterhub-rust-stack/issues/47)) ([2a5e259](https://github.com/aartintelligent/starterhub-rust-stack/commit/2a5e25907608e839db10c6ab2bfef35d27226f88))
+* make shutdown escalable and bounded ([#48](https://github.com/aartintelligent/starterhub-rust-stack/issues/48)) ([416b171](https://github.com/aartintelligent/starterhub-rust-stack/commit/416b1713ca94fe338c7a01d4413b8cc4660c86be))
+* **migration:** lock concurrent boot-time runs ([#49](https://github.com/aartintelligent/starterhub-rust-stack/issues/49)) ([e6a96aa](https://github.com/aartintelligent/starterhub-rust-stack/commit/e6a96aada5bcb8c20e59781e4ba8621100ec541a))
+
 ## [1.1.0](https://github.com/aartintelligent/starterhub-rust-stack/compare/v1.0.0...v1.1.0) (2026-07-22)
 
 
