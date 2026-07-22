@@ -12,6 +12,9 @@
 //! - Every new job is added to [`roster`], the single list the engine
 //!   loads at boot; the cron wiring in [`register`] is generic and never
 //!   changes.
+//! - A job declares its [`Overlap`] policy; by default a tick is skipped
+//!   while the previous run is still in flight, so a slow job never
+//!   overlaps itself.
 //! - Failures are logged uniformly by [`execute`] and wait for the next
 //!   tick: no job can crash the cron engine.
 
@@ -19,10 +22,26 @@ mod hello;
 
 use std::sync::Arc;
 
+use tokio::sync::Semaphore;
 use tokio_cron_scheduler::{Job as CronJob, JobScheduler, JobSchedulerError};
 
 use crate::error::JobResult;
 use crate::state::AppState;
+
+/// Behavior when a tick fires while a previous run of the same job is
+/// still in flight.
+///
+/// The guard is per-process: it protects a job from overlapping itself
+/// inside one instance of the binary. Running several instances would
+/// need a distributed lock (e.g. a PostgreSQL advisory lock) — out of
+/// scope while the stack deploys as a single instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Overlap {
+    /// Executions are independent; concurrent runs are fine.
+    Allow,
+    /// Skip the tick entirely; the run in flight keeps the slot.
+    Skip,
+}
 
 /// Contract every cron job implements.
 ///
@@ -35,6 +54,13 @@ pub trait Job: Send + Sync + 'static {
 
     /// Hard-coded cron expression driving the executions.
     fn schedule(&self) -> &'static str;
+
+    /// Concurrency policy enforced by the engine wiring. Skipping is
+    /// the safe default for jobs touching shared state: running
+    /// concurrently with oneself is the behavior a job must opt into.
+    fn overlap(&self) -> Overlap {
+        Overlap::Skip
+    }
 
     /// Body of the job; failures convert into [`crate::error::JobError`]
     /// with the `?` operator.
@@ -66,12 +92,37 @@ pub(crate) async fn register(scheduler: &JobScheduler, state: AppState) -> anyho
 /// else. The engine's own job type is imported as `CronJob` to keep the
 /// two concepts distinct.
 fn into_cron_job(job: Arc<dyn Job>, state: AppState) -> Result<CronJob, JobSchedulerError> {
+    // One gate per job, shared by every tick of this job: this is what
+    // makes the overlap policy per-job rather than global.
+    let gate = Arc::new(Semaphore::new(1));
+
     CronJob::new_async(job.schedule(), move |_id, _scheduler| {
         let job = Arc::clone(&job);
         let state = state.clone();
+        let gate = Arc::clone(&gate);
 
-        Box::pin(async move { execute(job.as_ref(), &state).await })
+        Box::pin(async move { dispatch(job.as_ref(), &state, &gate).await })
     })
+}
+
+/// Applies the job's [`Overlap`] policy, then runs it through [`execute`].
+///
+/// The semaphore permit is held across the whole run and released by
+/// drop — even on failure — so a skipped slot can never leak: the next
+/// tick after a completed run always executes.
+async fn dispatch(job: &dyn Job, state: &AppState, gate: &Semaphore) {
+    match job.overlap() {
+        Overlap::Allow => execute(job, state).await,
+        Overlap::Skip => match gate.try_acquire() {
+            Ok(_permit) => execute(job, state).await,
+            // Skipping is deliberate back-pressure, but a job skipped
+            // often is too slow for its schedule: WARN makes it visible.
+            Err(_) => tracing::warn!(
+                job = job.name(),
+                "job skipped: previous run still in flight"
+            ),
+        },
+    }
 }
 
 /// Runs a job body and converts its outcome into uniform telemetry.
@@ -89,10 +140,12 @@ async fn execute(job: &dyn Job, state: &AppState) {
 #[cfg(test)]
 mod tests {
     //! Unit tests of the private job wiring: the reference `hello` job,
-    //! the outcome telemetry of [`execute`] and the schedule validation
-    //! in [`into_cron_job`]. The happy registration path is covered end
-    //! to end by the engine lifecycle integration test.
+    //! the outcome telemetry of [`execute`], the overlap policy in
+    //! [`dispatch`] and the schedule validation in [`into_cron_job`].
+    //! The happy registration path is covered end to end by the engine
+    //! lifecycle integration test.
 
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     use sea_orm::{DatabaseBackend, MockDatabase};
@@ -138,6 +191,7 @@ mod tests {
 
         assert_eq!(job.name(), "hello");
         assert_eq!(job.schedule(), "0 * * * * * *");
+        assert_eq!(job.overlap(), Overlap::Skip);
         assert!(job.run(&state()).await.is_ok());
     }
 
@@ -155,6 +209,126 @@ mod tests {
     fn invalid_schedule_is_rejected() {
         assert_eq!(Failing.name(), "failing");
         assert!(into_cron_job(Arc::new(Failing), state()).is_err());
+    }
+
+    /// Job that parks inside `run` until released, counting executions:
+    /// lets a test hold a run in flight while it fires more ticks.
+    struct Parked {
+        /// Overlap policy under test.
+        overlap: Overlap,
+        /// Signalled each time a run starts.
+        started: Arc<Notify>,
+        /// Awaited by each run before returning.
+        release: Arc<Notify>,
+        /// Number of runs that actually started.
+        runs: AtomicUsize,
+    }
+
+    impl Parked {
+        fn new(overlap: Overlap) -> Self {
+            Self {
+                overlap,
+                started: Arc::new(Notify::new()),
+                release: Arc::new(Notify::new()),
+                runs: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Job for Parked {
+        fn name(&self) -> &'static str {
+            "parked"
+        }
+
+        fn schedule(&self) -> &'static str {
+            "* * * * * * *"
+        }
+
+        fn overlap(&self) -> Overlap {
+            self.overlap
+        }
+
+        async fn run(&self, _state: &AppState) -> JobResult {
+            self.runs.fetch_add(1, Ordering::SeqCst);
+            self.started.notify_one();
+            self.release.notified().await;
+
+            Ok(())
+        }
+    }
+
+    /// Fires one tick of `job` on its own task, as the engine would.
+    fn tick(
+        job: &Arc<Parked>,
+        state: &AppState,
+        gate: &Arc<Semaphore>,
+    ) -> tokio::task::JoinHandle<()> {
+        let job = Arc::clone(job);
+        let state = state.clone();
+        let gate = Arc::clone(gate);
+
+        tokio::spawn(async move { dispatch(job.as_ref(), &state, &gate).await })
+    }
+
+    /// Under [`Overlap::Skip`], a tick firing while the previous run is
+    /// in flight is dropped — and the slot frees up once the run ends.
+    #[tokio::test]
+    async fn skip_policy_drops_the_overlapping_tick() {
+        let job = Arc::new(Parked::new(Overlap::Skip));
+        let state = state();
+        let gate = Arc::new(Semaphore::new(1));
+
+        // First tick: takes the slot and parks inside `run`.
+        let first = tick(&job, &state, &gate);
+        job.started.notified().await;
+
+        // Second tick while the first is in flight: skipped, so it
+        // returns immediately without waiting for any release.
+        dispatch(job.as_ref(), &state, &gate).await;
+        assert_eq!(job.runs.load(Ordering::SeqCst), 1);
+
+        // Let the first run finish: its permit returns by drop.
+        job.release.notify_one();
+        first.await.expect("the first tick must complete");
+
+        // The slot is free again: the next tick executes normally.
+        job.release.notify_one();
+        dispatch(job.as_ref(), &state, &gate).await;
+        assert_eq!(job.runs.load(Ordering::SeqCst), 2);
+    }
+
+    /// Under [`Overlap::Allow`], ticks run concurrently: the second one
+    /// starts while the first is still parked in flight.
+    #[tokio::test]
+    async fn allow_policy_lets_ticks_overlap() {
+        let job = Arc::new(Parked::new(Overlap::Allow));
+        let state = state();
+        let gate = Arc::new(Semaphore::new(1));
+
+        let first = tick(&job, &state, &gate);
+        job.started.notified().await;
+        let second = tick(&job, &state, &gate);
+        job.started.notified().await;
+        assert_eq!(job.runs.load(Ordering::SeqCst), 2);
+
+        job.release.notify_one();
+        job.release.notify_one();
+        first.await.expect("the first tick must complete");
+        second.await.expect("the second tick must complete");
+    }
+
+    /// A failing run releases the slot on the way out: the guard can
+    /// never leak a permit and wedge the job forever.
+    #[tokio::test]
+    async fn skip_policy_frees_the_slot_after_a_failure() {
+        let state = state();
+        let gate = Semaphore::new(1);
+
+        dispatch(&Failing, &state, &gate).await;
+        dispatch(&Failing, &state, &gate).await;
+
+        assert_eq!(gate.available_permits(), 1);
     }
 
     /// Job on the fastest possible schedule, signalling each execution.
