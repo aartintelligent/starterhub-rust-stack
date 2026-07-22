@@ -31,7 +31,7 @@ jobs:
     # organization's machines. Free and unlimited on a public repository.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # rustup reads rust-toolchain.toml, so the exact pinned compiler
       # (channel + clippy + rustfmt) is installed — never "whatever
@@ -48,11 +48,11 @@ jobs:
           rustup toolchain install
 
       # Cache ~/.cargo and target/ keyed on the lockfile and toolchain.
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
       # `just` is the single entry point for every recipe, in CI as
       # locally.
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@c44f6b046f1c29ae5918b1e0bfdbb2f1813836fd # v2
         with:
           tool: just
 
@@ -64,7 +64,7 @@ jobs:
     # GitHub-hosted runner, same fork-safety rationale as the gate.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Same idempotent bootstrap as the gate; the llvm-tools component
       # comes from rust-toolchain.toml like the rest of the toolchain.
@@ -78,9 +78,9 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           rustup toolchain install
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@c44f6b046f1c29ae5918b1e0bfdbb2f1813836fd # v2
         with:
           tool: just,cargo-llvm-cov
 
@@ -99,7 +99,7 @@ jobs:
       # GitHub-hosted runners. The upload is a required check, so one
       # transient network failure must not block a PR — while two
       # consecutive failures still fail the job, on purpose.
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         id: upload
         continue-on-error: true
         with:
@@ -107,7 +107,7 @@ jobs:
           files: lcov.info
           fail_ci_if_error: true
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         if: steps.upload.outcome == 'failure'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

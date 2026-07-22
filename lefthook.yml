@@ -9,13 +9,22 @@
 #  Anything slower than pre-push lives in CI, not here. Hooks are a local
 #  convenience, opt-in via `just hooks` after cloning; the authority
 #  remains `just ci`, enforced by the ci workflow on every pull request.
+#
+#  Known limit: the commands run against the WORKING TREE, not the staged
+#  snapshot — a partially staged file is checked in its on-disk state, so
+#  a commit can pass locally yet fail `just ci` in CI (or vice versa).
+#  Checking the staged snapshot for a compiled language means a stash
+#  dance too fragile to automate; the CI gate is the authority.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Keep the output focused on failures: hide the meta banner and the
-# skipped-command noise.
-skip_output:
-  - meta
-  - skips
+# skipped-command noise. (`output` is the lefthook 2.x setting; the old
+# `skip_output` was silently ignored.)
+output:
+  - summary
+  - success
+  - failure
+  - execution
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  pre-commit — fast feedback, runs on every `git commit`
