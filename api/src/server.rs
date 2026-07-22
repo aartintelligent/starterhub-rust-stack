@@ -4,17 +4,25 @@
 //! the binary crate decides the address, provides the database connection
 //! and the shutdown future; this module does the rest — router assembly,
 //! socket tuning and the graceful serve loop.
+//!
+//! The serve loop is hand-rolled on `hyper-util` rather than
+//! `axum::serve`, for one reason: axum's loop exposes no header-read
+//! timeout, so a client sending its request head one byte at a time
+//! (slowloris) would hold a task forever — the per-request
+//! `TimeoutLayer` only starts once the head is fully parsed.
 
 use std::future::Future;
-use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
 use anyhow::Context;
 use axum::Router;
-use axum::serve::Listener;
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
+use hyper_util::server::conn::auto::Builder as ConnectionBuilder;
+use hyper_util::server::graceful::GracefulShutdown;
+use hyper_util::service::TowerToHyperService;
 use sea_orm::DatabaseConnection;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 
 use crate::middleware;
 use crate::router;
@@ -82,11 +90,9 @@ impl Server {
         // Bind before announcing anything: if the port is taken or the
         // interface is invalid, we fail fast with an error naming the
         // culprit address instead of logging a misleading "listening" line.
-        let listener = NoDelayListener(
-            TcpListener::bind(&self.addr)
-                .await
-                .with_context(|| format!("failed to bind {}", self.addr))?,
-        );
+        let listener = TcpListener::bind(&self.addr)
+            .await
+            .with_context(|| format!("failed to bind {}", self.addr))?;
 
         // Resolve the bound address eagerly so it is available before the
         // accept loop starts — the serve step only has to announce it.
@@ -98,6 +104,7 @@ impl Server {
             app,
             listener,
             local_addr,
+            timeout: self.timeout,
         })
     }
 
@@ -123,10 +130,14 @@ impl Server {
 pub struct BoundServer {
     /// Full application router wrapped in the middleware stack.
     app: Router,
-    /// Tuned listener owning the bound socket.
-    listener: NoDelayListener,
+    /// Listener owning the bound socket.
+    listener: TcpListener,
     /// Address actually bound, resolved at bind time.
     local_addr: SocketAddr,
+    /// Per-request budget, reused as the header-read budget: a client
+    /// unable to finish sending its request head within the time a whole
+    /// request may take is not a client worth waiting for.
+    timeout: Duration,
 }
 
 impl BoundServer {
@@ -138,13 +149,14 @@ impl BoundServer {
 
     /// Serves requests until `shutdown` resolves.
     ///
-    /// Shutdown is graceful: axum stops accepting new connections, lets
-    /// in-flight requests complete, then returns.
+    /// Shutdown is graceful: the loop stops accepting new connections,
+    /// tells every open connection to finish its in-flight request and
+    /// close (keep-alive included), then returns once all have drained.
     ///
     /// # Errors
     ///
-    /// Fails if the server loop aborts; the error carries enough context
-    /// to be actionable from the logs.
+    /// Reserved for future serve-loop failures; accept errors are
+    /// transient (the kernel keeps the listener alive) and only logged.
     pub async fn serve(
         self,
         shutdown: impl Future<Output = ()> + Send + 'static,
@@ -153,46 +165,75 @@ impl BoundServer {
         // line is what operators and tests rely on.
         tracing::info!("listening on {}", self.local_addr);
 
-        // Enter the accept loop; the future resolves once `shutdown` fires
-        // and every in-flight request has been given a chance to finish.
-        axum::serve(self.listener, self.app)
-            .with_graceful_shutdown(shutdown)
-            .await
-            .context("http server aborted")?;
+        // One protocol builder for every connection. The header-read
+        // timeout is the slowloris guard this whole hand-rolled loop
+        // exists for; both protocol stacks get a timer, without which
+        // hyper's timeout configuration panics at runtime.
+        let mut builder = ConnectionBuilder::new(TokioExecutor::new());
+        builder
+            .http1()
+            .timer(TokioTimer::new())
+            .header_read_timeout(self.timeout);
+        builder.http2().timer(TokioTimer::new());
 
+        // The graceful registry: every accepted connection is watched,
+        // and `shutdown()` below resolves once the last one drained.
+        let graceful = GracefulShutdown::new();
+        let service = TowerToHyperService::new(self.app);
+
+        tokio::pin!(shutdown);
+
+        loop {
+            tokio::select! {
+                accepted = self.listener.accept() => {
+                    let (stream, _peer) = match accepted {
+                        Ok(connection) => connection,
+                        // Transient by nature (EMFILE, aborted handshake):
+                        // the kernel keeps the listener alive, so log and
+                        // keep accepting instead of killing the server.
+                        Err(error) => {
+                            tracing::debug!(%error, "accept failed");
+                            continue;
+                        }
+                    };
+
+                    // Nagle's algorithm batches small writes at the cost
+                    // of latency; an API answering small JSON bodies is
+                    // exactly the workload it hurts. A failure only loses
+                    // an optimization, never the connection.
+                    if let Err(error) = stream.set_nodelay(true) {
+                        tracing::debug!(%error, "failed to set TCP_NODELAY");
+                    }
+
+                    // One task per connection, watched by the graceful
+                    // registry; `into_owned` detaches the connection from
+                    // the builder's lifetime so the task is 'static.
+                    let connection = graceful.watch(
+                        builder
+                            .serve_connection_with_upgrades(TokioIo::new(stream), service.clone())
+                            .into_owned(),
+                    );
+                    tokio::spawn(async move {
+                        // Connection-level errors (client reset, malformed
+                        // HTTP, the header-read timeout firing) are the
+                        // client's problem, not the server's: debug, not
+                        // error, or a port scan would flood the logs.
+                        if let Err(error) = connection.await {
+                            tracing::debug!(error = %error, "connection ended with an error");
+                        }
+                    });
+                }
+                () = &mut shutdown => break,
+            }
+        }
+
+        // Close the listener first so no new connection sneaks in while
+        // the open ones drain.
+        drop(self.listener);
+        tracing::info!("http server draining connections");
+        graceful.shutdown().await;
         tracing::info!("http server stopped");
 
         Ok(())
-    }
-}
-
-/// TCP listener enabling `TCP_NODELAY` on every accepted connection.
-///
-/// Nagle's algorithm batches small writes at the cost of latency; an API
-/// answering small JSON bodies is exactly the workload it hurts. Disabling
-/// it per accepted socket is the standard production tuning, and wrapping
-/// the listener is the one place that catches every connection.
-struct NoDelayListener(TcpListener);
-
-impl Listener for NoDelayListener {
-    type Io = TcpStream;
-    type Addr = SocketAddr;
-
-    async fn accept(&mut self) -> (Self::Io, Self::Addr) {
-        // Delegate to Tokio's listener (via axum's impl, which already
-        // retries transient accept errors), then tune the socket.
-        let (stream, addr) = Listener::accept(&mut self.0).await;
-
-        // A failure here only loses an optimization, never the connection:
-        // log at debug and keep serving.
-        if let Err(error) = stream.set_nodelay(true) {
-            tracing::debug!(%error, "failed to set TCP_NODELAY");
-        }
-
-        (stream, addr)
-    }
-
-    fn local_addr(&self) -> io::Result<Self::Addr> {
-        self.0.local_addr()
     }
 }

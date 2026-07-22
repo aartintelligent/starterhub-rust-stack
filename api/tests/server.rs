@@ -12,8 +12,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 
-/// Builds a server on `addr`, backed by a mock database.
-fn server(addr: &str) -> Server {
+/// Builds a server on `addr`, backed by a mock database, with the given
+/// request/header budget.
+fn server_with_timeout(addr: &str, timeout: Duration) -> Server {
     // Global TRACE-level test subscriber (first caller wins), so the log
     // statements of the exercised paths are fully evaluated.
     let _ = tracing_subscriber::fmt()
@@ -23,7 +24,12 @@ fn server(addr: &str) -> Server {
 
     let conn = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
 
-    Server::new(addr, conn, "under-test", false, Duration::from_secs(5))
+    Server::new(addr, conn, "under-test", false, timeout)
+}
+
+/// Builds a server on `addr` with a generous budget.
+fn server(addr: &str) -> Server {
+    server_with_timeout(addr, Duration::from_secs(5))
 }
 
 /// The server binds port 0, answers a real request on `/livez` through
@@ -60,6 +66,46 @@ async fn serves_and_stops_gracefully() {
     assert!(response.contains(r#"{"status":"ok"}"#), "got: {response}");
 
     // The serve future must resolve cleanly once shutdown fires.
+    shutdown.send(()).expect("server must still be running");
+    handle
+        .await
+        .expect("serve must not panic")
+        .expect("serve must stop cleanly");
+}
+
+/// A connection that never finishes sending its request head is cut by
+/// the header-read timeout (slowloris guard) instead of parking a task
+/// forever — and instead of stalling graceful shutdown.
+#[tokio::test]
+async fn slow_header_connection_is_cut() {
+    // One-second budget: generous for the loopback, small for the test.
+    let bound = server_with_timeout("127.0.0.1:0", Duration::from_secs(1))
+        .bind()
+        .await
+        .expect("port 0 must bind");
+    let addr = bound.local_addr();
+
+    let (shutdown, on_shutdown) = oneshot::channel::<()>();
+    let handle = tokio::spawn(bound.serve(async move {
+        let _ = on_shutdown.await;
+    }));
+
+    // Half a request head, then silence: the classic slowloris shape.
+    let mut stream = TcpStream::connect(addr).await.expect("server must accept");
+    stream
+        .write_all(b"GET /livez HTTP/1.1\r\nx-partial: ")
+        .await
+        .expect("request must be writable");
+
+    // The server must end the connection once the header budget elapses;
+    // the outer bound only exists so a regression fails fast instead of
+    // hanging the test suite.
+    let mut rest = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut rest))
+        .await
+        .expect("the header-read timeout must cut the connection")
+        .expect("the shutdown must be a clean TCP close");
+
     shutdown.send(()).expect("server must still be running");
     handle
         .await

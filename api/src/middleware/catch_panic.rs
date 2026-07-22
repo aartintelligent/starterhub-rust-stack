@@ -2,7 +2,11 @@
 //!
 //! A panicking handler must never tear down the connection with an empty
 //! reply: this layer converts the panic into a `500` carrying the standard
-//! error envelope, while the full payload goes to the logs.
+//! error envelope, while the full payload goes to the logs. Scope limit:
+//! the layer only guards up to the response being produced — a panic
+//! while *streaming* a response body would still drop the connection,
+//! which is fine while every body is in-memory JSON but must be
+//! revisited if a streaming endpoint ever lands.
 
 use std::any::Any;
 

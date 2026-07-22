@@ -40,4 +40,5 @@ The Rust version is pinned in five places that must stay in sync: `rust-toolchai
 - `unsafe_code = "forbid"` workspace-wide.
 - Everything documented, in English; comments explain *why*, not *what*.
 - Every API response body is JSON — including health probes and error paths.
+  Sole exception: `/docs` answers an empty `303` redirect into its static UI.
 - Never edit a shipped migration; always append a new one.
