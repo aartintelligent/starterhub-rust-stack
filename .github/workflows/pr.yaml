@@ -1,0 +1,59 @@
+# Pull request metadata gate.
+#
+# The repository squash-merges: the PR TITLE becomes the commit message
+# release-please parses on main, while the commit-msg hook only ever
+# validates the local commits that squashing discards. This workflow
+# closes that gap by validating the title itself with the same
+# `committed` configuration as the hook (committed.toml), plus the
+# lower-case house style that configuration documents but cannot
+# enforce.
+name: pr
+
+on:
+  pull_request:
+    # `edited` catches retitles; `synchronize` re-attaches the check to
+    # every new head commit, which is what lets branch protection
+    # require it.
+    types: [opened, edited, reopened, synchronize]
+
+# Read-only token: the workflow only inspects the PR title.
+permissions:
+  contents: read
+
+# One validation per PR: a retitle cancels the previous run.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: conventional title
+    # GitHub-hosted runner, same fork-safety rationale as ci.yaml: this
+    # workflow runs on fork PRs.
+    runs-on: ubuntu-latest
+    steps:
+      # Checked out only to reach committed.toml: the title must follow
+      # the exact same rules as local commit messages.
+      - uses: actions/checkout@v7
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: committed
+
+      # The title reaches the script through the environment, never by
+      # interpolation: a hostile title must stay data, not code.
+      - name: Validate the title as a Conventional Commit
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$TITLE" | committed --commit-file -
+
+      # `subject_capitalized = false` in committed.toml only disables
+      # the opposite check; the lower-case house style is enforced here.
+      - name: Enforce the lower-case description
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s\n' "$TITLE" | grep -qE '^[a-z]+(\([a-z0-9-]+\))?!?: [A-Z]'; then
+            echo "::error::the PR title description must start lower-case: $TITLE"
+            exit 1
+          fi

@@ -64,6 +64,14 @@ on:
 permissions:
   contents: read
 
+# One release build at a time, never canceled: two overlapping builds (a
+# release chased by a hotfix, or a manual rebuild racing the automatic
+# chain) would race their writes to the :buildcache tag, and the older
+# build finishing last could repoint `latest` backwards.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   image:
     name: build and push image
