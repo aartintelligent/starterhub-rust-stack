@@ -6,17 +6,27 @@
 //! build, register the job roster, tick, stop cleanly.
 
 use std::future::Future;
+use std::time::Duration;
 
 use anyhow::Context;
 use tokio_cron_scheduler::JobScheduler;
+use tokio_util::task::TaskTracker;
 
 use crate::job;
 use crate::state::AppState;
+
+/// Upper bound on the shutdown drain. Every run is already bounded by
+/// its own [`crate::job::Job::timeout`]; this second fence only exists
+/// so the process exit stays deterministic even if that invariant is
+/// ever broken.
+const DRAIN_GRACE: Duration = Duration::from_secs(30);
 
 /// A configured cron engine with every job registered, ready to tick.
 pub struct Server {
     /// Underlying tokio-cron-scheduler engine.
     inner: JobScheduler,
+    /// Registry of in-flight job runs, drained at shutdown.
+    tracker: TaskTracker,
 }
 
 impl Server {
@@ -38,19 +48,22 @@ impl Server {
         // Register the whole roster at construction time, not at start:
         // an invalid hard-coded schedule aborts the boot, instead of
         // surfacing after the application already reports itself healthy.
-        job::register(&inner, state)
+        // The tracker follows every run, so shutdown can drain them.
+        let tracker = TaskTracker::new();
+        job::register(&inner, state, &tracker)
             .await
             .context("failed to register the job roster")?;
 
-        Ok(Self { inner })
+        Ok(Self { inner, tracker })
     }
 
     /// Starts ticking, then waits for `shutdown` and stops cleanly.
     ///
     /// A clean stop halts the tick loop so no new job fires during the
-    /// shutdown window. Jobs already in flight run as detached tasks the
-    /// scheduler does not await: a long-running job can still be cut by
-    /// the process exit, so keep job bodies short or idempotent.
+    /// shutdown window, then **drains** the runs already in flight: each
+    /// is bounded by its own [`crate::job::Job::timeout`], and the drain
+    /// itself is fenced by [`DRAIN_GRACE`] so the process exit stays
+    /// deterministic no matter what.
     ///
     /// # Errors
     ///
@@ -79,14 +92,31 @@ impl Server {
         tracing::info!("cron engine shutting down");
 
         // Explicit engine shutdown rather than dropping it: the tick
-        // loop stops cleanly and no new job fires. In-flight jobs are
-        // detached tasks the scheduler does not await — the process exit
-        // may still cut one, which is why job bodies must stay short or
-        // idempotent.
+        // loop stops cleanly and no new job fires. In-flight runs are
+        // detached tasks the scheduler does not await — draining them is
+        // the tracker's job, just below.
         self.inner
             .shutdown()
             .await
             .context("failed to stop the cron engine")?;
+
+        // Drain the in-flight runs. The tick loop is stopped, so the
+        // tracker can no longer grow; `close` flips it so `wait`
+        // resolves once the last tracked run finishes. A run cut here
+        // would be mid-write: this wait is what makes the "graceful" in
+        // graceful shutdown true for jobs, not only for the API.
+        self.tracker.close();
+        if tokio::time::timeout(DRAIN_GRACE, self.tracker.wait())
+            .await
+            .is_err()
+        {
+            // Reaching this line means a job outlived its own budget —
+            // a bug worth a loud trace, not a hung process.
+            tracing::warn!(
+                grace = ?DRAIN_GRACE,
+                "jobs still in flight at the end of the drain grace; exiting anyway"
+            );
+        }
 
         // Terminal line for a clean stop, so operators can tell a
         // graceful exit from a crash in the journal.
