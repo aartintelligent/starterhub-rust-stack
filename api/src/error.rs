@@ -28,6 +28,10 @@ pub enum ApiError {
     #[error("resource not found")]
     NotFound,
 
+    /// The path exists but not with this HTTP method (405).
+    #[error("method not allowed")]
+    MethodNotAllowed,
+
     /// The request is syntactically valid but semantically wrong (400).
     #[error("{0}")]
     BadRequest(String),
@@ -60,6 +64,7 @@ impl ApiError {
     fn status_code(&self) -> StatusCode {
         match self {
             ApiError::NotFound => StatusCode::NOT_FOUND,
+            ApiError::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             // Rejections know their own status (400/415/422): forward it
@@ -83,9 +88,12 @@ impl IntoResponse for ApiError {
         // Split on the 4xx/5xx boundary: client errors carry an actionable
         // message, server errors are logged in full here — the single choke
         // point — and replaced by an opaque body so SQL, hosts or stack
-        // details never reach the client.
+        // details never reach the client. The alternate format (`:#`)
+        // walks the whole anyhow context chain: on the one path where the
+        // log line is all an operator gets, the root cause must be in it,
+        // not just the outermost context.
         let message = if status.is_server_error() {
-            tracing::error!(error = %self, "internal server error");
+            tracing::error!(error = %format_args!("{self:#}"), "internal server error");
             "internal server error".to_owned()
         } else {
             self.to_string()

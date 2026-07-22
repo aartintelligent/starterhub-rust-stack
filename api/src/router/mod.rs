@@ -62,8 +62,10 @@ pub fn router(state: AppState, docs: bool, name: &str) -> Router {
         .route("/livez", get(livez))
         .route("/readyz", get(readyz))
         // Unknown paths answer with the JSON error envelope instead of
-        // axum's default empty 404.
-        .fallback(not_found);
+        // axum's default empty 404 — and a known path hit with the wrong
+        // method gets the same treatment instead of axum's empty 405.
+        .fallback(not_found)
+        .method_not_allowed_fallback(method_not_allowed);
 
     // Interactive documentation, mounted only where exploration is
     // expected (the binary decides from the `environment` configuration:
@@ -169,4 +171,13 @@ async fn readyz(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
 /// JSON error envelope as the rest of the API.
 async fn not_found() -> ApiError {
     ApiError::NotFound
+}
+
+/// Answers a request whose path exists but whose method does not.
+///
+/// Same rationale as [`not_found`]: without this fallback, axum answers
+/// the built-in empty-body `405` — the one reachable response that
+/// would break the JSON-only rule.
+async fn method_not_allowed() -> ApiError {
+    ApiError::MethodNotAllowed
 }

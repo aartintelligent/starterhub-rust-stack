@@ -27,18 +27,21 @@ use tower::ServiceBuilder;
 /// Applies the full middleware stack to the router.
 ///
 /// Order matters and is intentional:
-/// 1. [`request_id::set`] first, so every later layer sees the id;
-/// 2. [`trace::layer`] next, opening a span already carrying that id;
-/// 3. [`request_id::propagate`] then mirrors the id onto the response;
-/// 4. [`body_limit::layer`] declares the request size cap consumed by
+/// 1. [`request_id::sanitize`] first, dropping a client-supplied id
+///    that would poison the logs;
+/// 2. [`request_id::set`] next, so every later layer sees a valid id;
+/// 3. [`trace::layer`] then opens a span already carrying that id;
+/// 4. [`request_id::propagate`] mirrors the id onto the response;
+/// 5. [`body_limit::layer`] declares the request size cap consumed by
 ///    the extractors;
-/// 5. [`timeout::handle`] + [`timeout::layer`] bound the time spent in
-///    everything below, answering a JSON `408` past `timeout`;
-/// 6. [`catch_panic::layer`] innermost, so a panicking handler still
+/// 6. [`timeout::handle`] + [`timeout::layer`] bound the time spent in
+///    everything below, answering a JSON `503` past `timeout`;
+/// 7. [`catch_panic::layer`] innermost, so a panicking handler still
 ///    produces a traced, correlated `500` instead of a dropped connection.
 pub fn apply(router: Router, timeout: Duration) -> Router {
     router.layer(
         ServiceBuilder::new()
+            .layer(axum::middleware::from_fn(request_id::sanitize))
             .layer(request_id::set())
             .layer(trace::layer())
             .layer(request_id::propagate())

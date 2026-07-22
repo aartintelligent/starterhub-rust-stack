@@ -28,6 +28,7 @@ migration = { path = "migration" }
 anyhow             = "1"
 async-trait        = "0.1"
 axum               = "0.8"
+hyper-util         = "0.1"
 config             = { version = "0.15", default-features = false, features = ["json"] }
 dotenvy            = "0.15"
 percent-encoding   = "2"

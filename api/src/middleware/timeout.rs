@@ -45,8 +45,13 @@ fn on_error(error: BoxError) -> Ready<Response> {
         // only records that the guard fired.
         tracing::warn!("request timed out");
 
+        // 503, not 408: RFC 9110 defines 408 as "the client took too
+        // long to SEND its request" and invites automatic retries —
+        // exactly the wrong signal when the server side is the slow
+        // party, and a 4xx would also hide the outage from monitoring
+        // that alerts on 5xx rates.
         (
-            StatusCode::REQUEST_TIMEOUT,
+            StatusCode::SERVICE_UNAVAILABLE,
             axum::Json(json!({ "error": "request timed out" })),
         )
     } else {
@@ -63,7 +68,7 @@ fn on_error(error: BoxError) -> Ready<Response> {
 
 #[cfg(test)]
 mod tests {
-    //! The timeout branch (408) is covered end to end by the router
+    //! The timeout branch (503) is covered end to end by the router
     //! integration tests; only the defensive non-timeout branch needs a
     //! direct call — nothing in the real stack can produce it.
 

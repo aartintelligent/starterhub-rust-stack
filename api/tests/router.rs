@@ -235,9 +235,12 @@ async fn malformed_path_parameter_rejects_through_envelope() {
     assert!(body["error"].is_string(), "rejection must use the envelope");
 }
 
-/// A handler slower than the configured timeout answers a JSON `408`.
+/// A handler slower than the configured timeout answers a JSON `503`:
+/// the server is the slow party, so the status must be a 5xx (a `408`
+/// would invite client auto-retries and hide the outage from 5xx-based
+/// monitoring).
 #[tokio::test]
-async fn slow_request_answers_json_408() {
+async fn slow_request_answers_json_503() {
     /// Handler sleeping far past the test's timeout.
     async fn slow() -> &'static str {
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -251,8 +254,22 @@ async fn slow_request_answers_json_408() {
 
     let (status, body) = call(app, get_request("/slow")).await;
 
-    assert_eq!(status, StatusCode::REQUEST_TIMEOUT);
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"], "request timed out");
+}
+
+/// A known path hit with the wrong method answers `405` through the
+/// JSON envelope, never axum's default empty body.
+#[tokio::test]
+async fn wrong_method_answers_json_405() {
+    let request = Request::post("/livez")
+        .body(Body::empty())
+        .expect("valid request");
+
+    let (status, body) = call(app(false), request).await;
+
+    assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(body["error"], "method not allowed");
 }
 
 /// A panicking handler answers an opaque JSON `500` — whatever the shape
